@@ -3,7 +3,7 @@ import { CrmLead, KanbanColumn } from "@/pages/Comercial";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Trash2, Phone, Mail, Store, MoreHorizontal, Pencil, Clock, TrendingUp, Archive } from "lucide-react";
+import { Trash2, Store, MoreHorizontal, Pencil, Archive } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -68,6 +68,10 @@ export function LeadKanban({ leads, columns, isLoading, onEditLead, onDeleteLead
     };
     const [isAddColumnOpen, setIsAddColumnOpen] = useState(false);
     const [newColumnTitle, setNewColumnTitle] = useState("");
+    const [scoreFilter, setScoreFilter] = useState<string | null>(null);
+    const [searchTerm, setSearchTerm] = useState("");
+
+    const SCORE_ORDER: Record<string, number> = { 'Quente': 0, 'Morno': 1, 'Frio': 2 };
 
     const leadsByStatus = useMemo(() => {
         const acc: Record<string, CrmLead[]> = {};
@@ -81,7 +85,10 @@ export function LeadKanban({ leads, columns, isLoading, onEditLead, onDeleteLead
         }
 
         if (Array.isArray(leads)) {
+            const busca = searchTerm.trim().toLowerCase();
             leads.forEach(lead => {
+                if (scoreFilter && lead.lead_score !== scoreFilter) return;
+                if (busca && !`${lead.name} ${lead.store_name || ''}`.toLowerCase().includes(busca)) return;
                 const statusKey = lead.column_id || (columns.find(c => c.title.toLowerCase().replace(/\s+/g, '_') === lead.lead_status)?.id || '');
                 if (statusKey) {
                     if (!acc[statusKey]) {
@@ -92,8 +99,13 @@ export function LeadKanban({ leads, columns, isLoading, onEditLead, onDeleteLead
             });
         }
 
+        // Mais quentes primeiro dentro de cada coluna
+        Object.values(acc).forEach(list => list.sort((a, b) =>
+            (SCORE_ORDER[a.lead_score ?? ''] ?? 3) - (SCORE_ORDER[b.lead_score ?? ''] ?? 3)
+        ));
+
         return acc;
-    }, [leads, columns]);
+    }, [leads, columns, scoreFilter, searchTerm]);
 
     const handleDragStart = (e: React.DragEvent, lead: CrmLead) => {
         setDraggedLead(lead);
@@ -236,16 +248,47 @@ export function LeadKanban({ leads, columns, isLoading, onEditLead, onDeleteLead
 
     return (
         <div className="h-full">
+            <div className="flex items-center gap-2 pb-3 flex-wrap">
+                <input
+                    type="search"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Buscar por loja ou nome..."
+                    className="h-8 w-64 px-3 rounded-full text-[12px] bg-muted/30 border border-border/50 text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-all"
+                />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70 ml-1">Filtrar:</span>
+                {[
+                    { v: null, label: 'Todos' },
+                    { v: 'Quente', label: 'Quente 🔥' },
+                    { v: 'Morno', label: 'Morno 🌤' },
+                    { v: 'Frio', label: 'Frio ❄️' },
+                ].map(f => (
+                    <button
+                        key={f.label}
+                        onClick={() => setScoreFilter(f.v)}
+                        className={cn(
+                            "text-[11px] font-bold px-3 py-1 rounded-full border transition-colors",
+                            scoreFilter === f.v
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "bg-muted/30 text-muted-foreground border-border/50 hover:bg-muted/60"
+                        )}
+                    >
+                        {f.label}
+                    </button>
+                ))}
+            </div>
             <div className="flex gap-4 items-stretch overflow-x-auto pb-4">
-                {columns.map((col) => {
+                {columns.map((col, colIdx) => {
                     const colLeads = leadsByStatus[col.id] || [];
                     const isOverThisColumn = draggedLead && !targetTask /* Only light up empty areas */;
+                    const colText = col.color?.split(' ').find(c => c.startsWith('text-')) || 'text-muted-foreground';
 
                     return (
                         <div
                             key={col.id}
                             className={cn(
-                                "flex flex-col h-full min-w-[280px] flex-1 rounded-2xl bg-muted/20 border border-border/50 transition-all group/column shrink-0",
+                                "flex flex-col h-full rounded-2xl bg-muted/20 border border-border/50 transition-all group/column shrink-0",
+                                colIdx === 0 ? "min-w-[340px] flex-1 max-w-[420px]" : "w-[250px] min-w-[250px]",
                                 "shadow-[0_2px_10px_-3px_rgba(0,0,0,0.07)] hover:shadow-[0_4px_20px_-5px_rgba(0,0,0,0.1)]",
                                 draggedLead && "border-dashed border-primary/50"
                             )}
@@ -260,8 +303,8 @@ export function LeadKanban({ leads, columns, isLoading, onEditLead, onDeleteLead
                         >
                             <div className="p-3 flex items-center justify-between border-b border-border/50 bg-muted/30 rounded-t-2xl">
                                 <div className="flex items-center gap-2">
-                                    <div className={cn("w-2 h-2 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.1)]", col.color?.split(' ')[0] || "bg-secondary")} />
-                                    <span className="font-bold text-xs uppercase tracking-wider text-muted-foreground/80">{col.title}</span>
+                                    <div className={cn("w-2.5 h-2.5 rounded-full bg-current shadow-[0_0_8px_rgba(0,0,0,0.1)]", colText)} />
+                                    <span className={cn("font-bold text-xs uppercase tracking-wider", colText === 'text-muted-foreground' ? 'text-muted-foreground/80' : colText)}>{col.title}</span>
                                     <span className="ml-1 text-[10px] font-black text-primary bg-primary/5 px-2 py-0.5 rounded-full border border-primary/10">
                                         {colLeads.length}
                                     </span>
@@ -299,11 +342,11 @@ export function LeadKanban({ leads, columns, isLoading, onEditLead, onDeleteLead
                                                     draggedLead?.id === lead.id && "opacity-40 ring-2 ring-primary scale-[0.98] rotate-2"
                                                 )}
                                             >
-                                                <div className="p-3 space-y-3">
+                                                <div className="p-2.5 space-y-2">
                                                     {/* Title & Menu */}
                                                     <div className="flex items-start justify-between gap-2 group/title">
                                                         <div className="flex-1 min-w-0">
-                                                            <h4 className="text-base font-black capitalize tracking-tight text-foreground block truncate group-hover:text-primary transition-colors">
+                                                            <h4 className="text-sm font-bold tracking-tight text-foreground block truncate group-hover:text-primary transition-colors">
                                                                 {lead.name}
                                                             </h4>
                                                         </div>
@@ -338,35 +381,15 @@ export function LeadKanban({ leads, columns, isLoading, onEditLead, onDeleteLead
                                                         </DropdownMenu>
                                                     </div>
 
-                                                    <div className="space-y-1.5 py-0.5">
-                                                        {lead.store_name && (
-                                                            <div className="flex items-center gap-2 text-[11px] text-muted-foreground/80">
-                                                                <Store className="h-3 w-3 shrink-0 opacity-70" />
-                                                                <span className="truncate">{lead.store_name}</span>
-                                                            </div>
-                                                        )}
-                                                        {lead.phone && (
-                                                            <div className="flex items-center gap-2 text-[11px] text-muted-foreground/80">
-                                                                <Phone className="h-3 w-3 shrink-0 opacity-70" />
-                                                                <span className="truncate font-mono">{lead.phone}</span>
-                                                            </div>
-                                                        )}
-                                                        {lead.email && (
-                                                            <div className="flex items-center gap-2 text-[11px] text-muted-foreground/80">
-                                                                <Mail className="h-3 w-3 shrink-0 opacity-70" />
-                                                                <span className="truncate">{lead.email}</span>
-                                                            </div>
-                                                        )}
-                                                        {lead.revenue && (
-                                                            <div className="flex items-center gap-2 text-[11px] text-muted-foreground/80">
-                                                                <TrendingUp className="h-3 w-3 shrink-0 opacity-70" />
-                                                                <span className="truncate">{lead.revenue}</span>
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                                    {lead.store_name && (
+                                                        <div className="flex items-center gap-2 text-[11px] text-muted-foreground/80">
+                                                            <Store className="h-3 w-3 shrink-0 opacity-70" />
+                                                            <span className="truncate">{lead.store_name}</span>
+                                                        </div>
+                                                    )}
 
                                                     {/* Footer Info */}
-                                                    <div className="flex items-center justify-between pt-2 border-t border-dashed border-border/40 mt-1">
+                                                    <div className="flex items-center justify-between pt-1.5 border-t border-dashed border-border/40">
                                                         <div className="flex items-center gap-2 min-w-0">
                                                             {lead.product_interest && (() => {
                                                                 const v = lead.product_interest.toLowerCase();
