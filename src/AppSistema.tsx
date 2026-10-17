@@ -32,6 +32,7 @@ const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const Financeiro = lazy(() => import("./pages/Financeiro"));
 const FinanceiroAcademy = lazy(() => import("./pages/FinanceiroAcademy"));
 const Comercial = lazy(() => import("./pages/Comercial"));
+const RadarPage = lazy(() => import("./pages/RadarPage"));
 const RankingClientes = lazy(() => import("./pages/RankingClientes"));
 const Clients = lazy(() => import("./pages/Clients"));
 const ClientDetails = lazy(() => import("./pages/ClientDetails"));
@@ -347,6 +348,12 @@ export default function AppSistema() {
                                     <AgencyLayout><Comercial /></AgencyLayout>
                                   </AbacRoute>
                                 } />
+                                {/* Radar: o acesso real é radar_can_view() no banco; a página redireciona quem não tem */}
+                                <Route path="radar" element={
+                                  <AbacRoute resource="visao_geral" action="read">
+                                    <AgencyLayout><RadarPage /></AgencyLayout>
+                                  </AbacRoute>
+                                } />
                                 <Route path="timeline" element={
                                   <AbacRoute resource="visao_geral" action="read">
                                     <AgencyLayout><TimelinePage /></AgencyLayout>
@@ -495,6 +502,16 @@ export default function AppSistema() {
                                   <ProtectedRoute requiredFeature="crm">
                                     <DashboardLayout>
                                       <Comercial />
+                                    </DashboardLayout>
+                                  </ProtectedRoute>
+                                }
+                              />
+                              <Route
+                                path="/radar"
+                                element={
+                                  <ProtectedRoute>
+                                    <DashboardLayout>
+                                      <RadarPage />
                                     </DashboardLayout>
                                   </ProtectedRoute>
                                 }

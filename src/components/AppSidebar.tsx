@@ -97,6 +97,7 @@ import {
   CalendarDaysIcon,
   Cog6ToothIcon,
   DevicePhoneMobileIcon,
+  ViewfinderCircleIcon,
 } from "@heroicons/react/24/outline";
 // Variantes preenchidas pro item ATIVO (padrão iOS: outline em repouso, solid ativo)
 import {
@@ -109,7 +110,9 @@ import {
   CalendarDaysIcon as CalendarDaysSolid,
   Cog6ToothIcon as Cog6ToothSolid,
   DevicePhoneMobileIcon as DevicePhoneMobileSolid,
+  ViewfinderCircleIcon as ViewfinderCircleSolid,
 } from "@heroicons/react/24/solid";
+import { useRadarAccess } from "@/hooks/useRadarAccess";
 
 type IconComponent = LucideIcon | React.ComponentType<any>;
 
@@ -136,6 +139,8 @@ const mainMenuItems: MenuItem[] = [
   { section: 'agency', title: "Demandas", transKey: "sidebar.tasks", url: "/tasks", icon: ClipboardDocumentListIcon },
   { section: 'agency', title: "Prioridades", transKey: "sidebar.priorities", url: "/prioridades", icon: FlagIcon },
   { section: 'agency', title: "Comercial", transKey: "sidebar.crm", url: "/comercial", icon: DocumentTextIcon },
+  // Radar: só pra quem tem radar_can_view() no banco (filtro abaixo).
+  { section: 'agency', title: "Radar", transKey: "sidebar.radar", url: "/radar", icon: ViewfinderCircleIcon },
   // Clientes vira item único (dropdown removido a pedido) — vai pra lista.
   { section: 'agency', title: "Clientes", transKey: "sidebar.clients", url: "/clients", icon: UserGroupIcon },
   { section: 'agency', title: "Aplicativos", transKey: "sidebar.apps", url: "/aplicativos", icon: DevicePhoneMobileIcon },
@@ -173,6 +178,7 @@ export function AppSidebar() {
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const { canView, isAdmin, isClient, isLoading: isLoadingPermissions } = usePermissions();
+  const { canViewRadar } = useRadarAccess();
 
   const isAdminMode = isAgency;
 
@@ -285,10 +291,11 @@ export function AppSidebar() {
       if (feature && !canView(feature)) return false;
       if (item.transKey === "sidebar.account_groups") return !isAdminMode;
       if (item.transKey === "sidebar.paineis") return isAdmin;
+      if (item.transKey === "sidebar.radar") return canViewRadar && !isClient;
       if (!item.url && (!item.submenu || (Array.isArray(item.submenu) && item.submenu.length === 0))) return false;
       return true;
     });
-  }, [isAdminMode, canView, selectedClientId, isAgency, isClient]);
+  }, [isAdminMode, canView, selectedClientId, isAgency, isClient, canViewRadar]);
 
   const handleNavClick = () => {
     if (isMobile) {
@@ -307,6 +314,7 @@ export function AppSidebar() {
     [CalendarDaysIcon, CalendarDaysSolid],
     [Cog6ToothIcon, Cog6ToothSolid],
     [DevicePhoneMobileIcon, DevicePhoneMobileSolid],
+    [ViewfinderCircleIcon, ViewfinderCircleSolid],
   ]);
 
   const renderIcon = (Icon: IconComponent, className?: string, active = false) => {

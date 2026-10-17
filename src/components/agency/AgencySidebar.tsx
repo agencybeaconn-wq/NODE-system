@@ -8,6 +8,7 @@ import {
     ArrowTrendingUpIcon,
     UserGroupIcon,
     CalendarDaysIcon,
+    ViewfinderCircleIcon,
 } from "@heroicons/react/24/outline";
 import type { ComponentType, SVGProps } from "react";
 import {
@@ -17,9 +18,11 @@ import {
     UserGroupIcon as UserGroupSolid,
     CalendarDaysIcon as CalendarDaysSolid,
     ClipboardDocumentCheckIcon as ClipboardDocumentCheckSolid,
+    ViewfinderCircleIcon as ViewfinderCircleSolid,
 } from "@heroicons/react/24/solid";
 import { NavLink, useLocation } from "react-router-dom";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { useRadarAccess } from "@/hooks/useRadarAccess";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -54,8 +57,12 @@ const MENU: MenuItem[] = [
     },
 ];
 
+// Só aparece pra quem tem acesso no banco (radar_can_view).
+const RADAR_ITEM: MenuItem = { title: "Radar", icon: ViewfinderCircleIcon, url: "/agency/radar" };
+
 // Ativo = ícone preenchido (padrão iOS), repouso = outline.
 const SOLID_MAP = new Map<Icon, Icon>([
+    [ViewfinderCircleIcon, ViewfinderCircleSolid],
     [ClipboardDocumentListIcon, ClipboardDocumentListSolid],
     [FlagIcon, FlagSolid],
     [ArrowTrendingUpIcon, ArrowTrendingUpSolid],
@@ -68,6 +75,13 @@ export function AgencySidebar({ onNavigate }: { onNavigate?: () => void }) {
     const { state, isMobile, setOpenMobile, open, setOpen } = useSidebar();
     const location = useLocation();
     const isCollapsed = state === "collapsed";
+    const { canViewRadar } = useRadarAccess();
+    // Radar entra logo depois de Comercial.
+    const menu = useMemo(() => {
+        if (!canViewRadar) return MENU;
+        const i = MENU.findIndex((m) => m.url === "/agency/comercial");
+        return [...MENU.slice(0, i + 1), RADAR_ITEM, ...MENU.slice(i + 1)];
+    }, [canViewRadar]);
     const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({});
     const [initialized, setInitialized] = useState<Record<string, boolean>>({});
     const [isHovering, setIsHovering] = useState(false);
@@ -205,7 +219,7 @@ export function AgencySidebar({ onNavigate }: { onNavigate?: () => void }) {
             <SidebarContent className="p-0">
                 <SidebarGroup className="p-0">
                     <SidebarMenu className="gap-0">
-                        {MENU.map(renderItem)}
+                        {menu.map(renderItem)}
                     </SidebarMenu>
                 </SidebarGroup>
             </SidebarContent>
