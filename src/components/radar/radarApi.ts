@@ -1,7 +1,7 @@
 // Camada de dados do Radar de lojas (tabelas radar_* no Supabase).
 // O coletor roda no PC do JV (NODE-Radar) e grava eventos, métricas e execuções;
 // o app lê tudo isso e edita só lojas, buscas e candidatas. O acesso é decidido
-// no banco por radar_can_view() (dono do workspace + allowlist radar_access).
+// no banco por radar_can_view() (só quem está na allowlist radar_access).
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 
