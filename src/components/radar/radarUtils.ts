@@ -1,6 +1,6 @@
 import { format, parseISO, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import type { RadarMetric, RadarRun } from "./radarApi";
+import type { NivelPotencial, RadarRun } from "./radarApi";
 
 // Nichos com termos sugeridos pra busca na Biblioteca de Anúncios.
 // Vários termos separados por ";" somam resultados.
@@ -44,6 +44,32 @@ export const PLATAFORMAS: Record<string, string> = {
     unknown: "A detectar",
 };
 
+const MOEDA_POR_PAIS: Record<string, string> = { BR: "BRL", US: "USD", ES: "EUR", PT: "EUR", GB: "GBP", MX: "MXN" };
+
+// Moeda da loja: a que a vitrine publica (perfil) ou, sem isso, a do país.
+export const moedaDaLoja = (s: { country: string; profile?: { moeda?: string | null } | null }) => s.profile?.moeda || MOEDA_POR_PAIS[s.country] || null;
+
+// Preço na moeda da loja (o catálogo vem na moeda dela). Moeda desconhecida: só o número.
+export function fmtMoeda(valor: number | null | undefined, moeda: string | null) {
+    if (valor == null) return "–";
+    const casas = valor >= 100 ? 0 : 2;
+    if (!moeda) return valor.toLocaleString("pt-BR", { maximumFractionDigits: casas });
+    return valor.toLocaleString("pt-BR", { style: "currency", currency: moeda, maximumFractionDigits: casas });
+}
+
+export const fmtNumero = (n: number | null | undefined) => (n == null ? "–" : n.toLocaleString("pt-BR"));
+
+export const NIVEL_INFO: Record<NivelPotencial, { rotulo: string; classe: string; anel: string }> = {
+    alto: { rotulo: "Alto", classe: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400", anel: "stroke-emerald-500" },
+    medio: { rotulo: "Médio", classe: "bg-amber-500/15 text-amber-700 dark:text-amber-400", anel: "stroke-amber-500" },
+    baixo: { rotulo: "Baixo", classe: "bg-zinc-500/15 text-zinc-700 dark:text-zinc-300", anel: "stroke-zinc-400" },
+    sem_dados: { rotulo: "Aguardando dados", classe: "bg-muted text-muted-foreground", anel: "stroke-muted-foreground/30" },
+};
+
+export const nivelDe = (detalhe: { nivel?: NivelPotencial } | null | undefined): NivelPotencial => detalhe?.nivel ?? "sem_dados";
+
+export const linkBiblioteca = (adId: string) => `https://www.facebook.com/ads/library/?id=${adId}`;
+
 export const diasAtras = (n: number) => format(subDays(new Date(), n), "yyyy-MM-dd");
 
 export const dataCurta = (iso: string) => format(parseISO(iso), "dd/MM", { locale: ptBR });
@@ -51,51 +77,6 @@ export const dataCurta = (iso: string) => format(parseISO(iso), "dd/MM", { local
 export const dataLonga = (iso: string) => format(parseISO(iso), "EEEE, dd 'de' MMMM", { locale: ptBR });
 
 export const dataHora = (iso: string) => format(parseISO(iso), "dd/MM HH:mm", { locale: ptBR });
-
-export interface ResumoLoja {
-    products: number | null;
-    productsDelta: number | null;
-    ads: number | null;
-    adsDelta: number | null;
-    adsVideo: number | null;
-    oldestAdDays: number | null;
-}
-
-// Último valor conhecido e a variação contra ~7 dias antes (ou o mais antigo disponível).
-function ultimoEDelta(linhas: RadarMetric[], campo: "products" | "ads_active") {
-    const com = linhas.filter((m) => m[campo] != null);
-    if (!com.length) return { valor: null, delta: null };
-    const ultimo = com[com.length - 1];
-    const limite = format(subDays(parseISO(ultimo.day), 7), "yyyy-MM-dd");
-    const base = com.find((m) => m.day >= limite) ?? com[0];
-    const valor = ultimo[campo] as number;
-    return { valor, delta: base === ultimo ? null : valor - (base[campo] as number) };
-}
-
-export function resumirMetricas(metricas: RadarMetric[]): Map<string, ResumoLoja> {
-    const porLoja = new Map<string, RadarMetric[]>();
-    for (const m of metricas) {
-        const l = porLoja.get(m.store_id) ?? [];
-        l.push(m);
-        porLoja.set(m.store_id, l);
-    }
-    const saida = new Map<string, ResumoLoja>();
-    for (const [id, linhas] of porLoja) {
-        linhas.sort((a, b) => a.day.localeCompare(b.day));
-        const p = ultimoEDelta(linhas, "products");
-        const a = ultimoEDelta(linhas, "ads_active");
-        const ultimoAds = [...linhas].reverse().find((m) => m.ads_active != null);
-        saida.set(id, {
-            products: p.valor,
-            productsDelta: p.delta,
-            ads: a.valor,
-            adsDelta: a.delta,
-            adsVideo: ultimoAds?.ads_video ?? null,
-            oldestAdDays: ultimoAds?.oldest_ad_days ?? null,
-        });
-    }
-    return saida;
-}
 
 // Pior status entre as últimas execuções da loja (erro > bloqueio > pulado > ok).
 export function statusColeta(runs: RadarRun[]): { status: RadarRun["status"] | "never"; quando: string | null; erro: string | null } {

@@ -8,18 +8,24 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useRadarAccess } from "@/hooks/useRadarAccess";
-import { listarLojas, type RadarStore } from "@/components/radar/radarApi";
+import { listarLojas, listarTags } from "@/components/radar/radarApi";
 import { RadarFeed } from "@/components/radar/RadarFeed";
-import { RadarStoresTable } from "@/components/radar/RadarStoresTable";
+import { RadarStoresGrid } from "@/components/radar/RadarStoresGrid";
+import { RadarTagManager } from "@/components/radar/RadarTagManager";
 import { RadarSearchPanel } from "@/components/radar/RadarSearchPanel";
 import { RadarStoreSheet } from "@/components/radar/RadarStoreSheet";
 
 export default function RadarPage() {
     const { canViewRadar, denied, isLoading: carregandoAcesso, error: erroAcesso, retry } = useRadarAccess();
     const [nicho, setNicho] = useState("all");
-    const [aberta, setAberta] = useState<RadarStore | null>(null);
+    const [abertaId, setAbertaId] = useState<string | null>(null);
+    const [tagsAbertas, setTagsAbertas] = useState(false);
 
     const lojas = useQuery({ queryKey: ["radar_stores"], queryFn: listarLojas, enabled: canViewRadar });
+    const tags = useQuery({ queryKey: ["radar_tags"], queryFn: listarTags, enabled: canViewRadar });
+    // A ficha lê a loja da lista atual: nota, tag e anotação aparecem na hora depois de salvar.
+    const aberta = useMemo(() => (lojas.data ?? []).find((s) => s.id === abertaId) ?? null, [lojas.data, abertaId]);
+    const abrir = (s: { id: string }) => setAbertaId(s.id);
     const nichos = useMemo(() => [...new Set((lojas.data ?? []).map((s) => s.niche))].sort(), [lojas.data]);
     const ativas = (lojas.data ?? []).filter((s) => s.active).length;
 
@@ -42,7 +48,7 @@ export default function RadarPage() {
                 <div>
                     <h1 className="text-3xl font-black tracking-tight text-foreground">Radar de lojas</h1>
                     <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-                        {ativas} lojas acompanhadas todo dia: catálogo, home e anúncios ativos. Cada mudança vira um registro com data.
+                        {ativas} lojas acompanhadas todo dia: catálogo, mais vendidos, home e anúncios ativos. Cada mudança vira um registro com data.
                     </p>
                 </div>
                 <Select value={nicho} onValueChange={setNicho}>
@@ -56,24 +62,33 @@ export default function RadarPage() {
 
             {lojas.error && <p className="text-sm text-destructive">{(lojas.error as Error).message}</p>}
 
-            <Tabs defaultValue="feed" className="space-y-4">
+            <Tabs defaultValue="lojas" className="space-y-4">
                 <TabsList>
-                    <TabsTrigger value="feed">O que mudou</TabsTrigger>
                     <TabsTrigger value="lojas">Lojas</TabsTrigger>
+                    <TabsTrigger value="feed">O que mudou</TabsTrigger>
                     <TabsTrigger value="busca">Buscar lojas</TabsTrigger>
                 </TabsList>
                 <TabsContent value="feed">
-                    <RadarFeed stores={lojas.data ?? []} niche={nicho} onOpenStore={setAberta} />
+                    <RadarFeed stores={lojas.data ?? []} niche={nicho} onOpenStore={abrir} />
                 </TabsContent>
                 <TabsContent value="lojas">
-                    <RadarStoresTable stores={lojas.data ?? []} niches={nichos} niche={nicho} onOpenStore={setAberta} />
+                    <RadarStoresGrid
+                        stores={lojas.data ?? []}
+                        tags={tags.data ?? []}
+                        niches={nichos}
+                        niche={nicho}
+                        carregando={lojas.isLoading}
+                        onOpenStore={abrir}
+                        onGerenciarTags={() => setTagsAbertas(true)}
+                    />
                 </TabsContent>
                 <TabsContent value="busca">
                     <RadarSearchPanel niches={nichos} />
                 </TabsContent>
             </Tabs>
 
-            <RadarStoreSheet store={aberta} onClose={() => setAberta(null)} />
+            <RadarStoreSheet store={aberta} tags={tags.data ?? []} onClose={() => setAbertaId(null)} />
+            <RadarTagManager open={tagsAbertas} onOpenChange={setTagsAbertas} tags={tags.data ?? []} stores={lojas.data ?? []} />
         </div>
     );
 }

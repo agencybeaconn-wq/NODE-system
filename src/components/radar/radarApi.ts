@@ -21,6 +21,104 @@ export interface RadarStore {
     active: boolean;
     source: "manual" | "search" | "leads";
     created_at: string;
+    notes: string | null;
+    rating: number | null;
+    potential: number | null;
+    potential_detail: PotencialDetalhe | null;
+    profile: PerfilLoja | null;
+    profile_at: string | null;
+    tag_ids: number[];
+}
+
+// ─── Perfil montado pelo coletor (NODE-Radar/lib/perfil.mjs) ───
+
+export type NivelPotencial = "alto" | "medio" | "baixo" | "sem_dados";
+
+export interface ComponentePotencial {
+    rotulo: string;
+    max: number;
+    valor: number | null;
+    pontos: number | null;
+    disponivel: boolean;
+}
+
+export interface PotencialDetalhe {
+    score: number | null;
+    nivel: NivelPotencial;
+    parcial: boolean;
+    anuncios_capturados_em?: string | null;
+    anuncios_desatualizados?: boolean;
+    componentes: Record<string, ComponentePotencial>;
+}
+
+export interface ProdutoPerfil {
+    handle: string | null;
+    titulo: string;
+    preco: number | null;
+    de?: number | null;
+    img: string | null;
+    url: string | null;
+    disponivel?: boolean | null;
+    anuncios?: number;
+    tipo?: "produto" | "colecao" | "home" | "pagina" | "externo";
+}
+
+export interface AnuncioPerfil {
+    id: string;
+    inicio: string | null;
+    dias: number | null;
+    midia: "video" | "img" | "?";
+    capa: string | null;
+    texto: string | null;
+    link: string | null;
+    variantes?: number;
+}
+
+export interface PerfilLoja {
+    atualizado_em: string;
+    titulo: string | null;
+    descricao: string | null;
+    avisos: string[];
+    destaques_home: string[];
+    tema: { nome?: string; schema?: string; versao?: string } | null;
+    checkout: string | null;
+    moeda?: string | null;
+    apps: string[];
+    sinais: Record<"pixel_meta" | "checkout_otimizado" | "avaliacoes" | "email_crm" | "whatsapp", boolean>;
+    catalogo: {
+        total: number | null;
+        lidos: number;
+        truncado: boolean;
+        preco_mediano: number | null;
+        preco_min: number | null;
+        preco_max: number | null;
+        esgotados: number;
+        com_desconto: number;
+        novos_30d: number | null;
+    } | null;
+    anuncios: {
+        ativos: number;
+        criativos?: number;
+        video: number;
+        imagem: number;
+        vencedores: number;
+        novos_7d: number | null;
+        crescimento_7d: number | null;
+        mais_antigo_dias: number | null;
+        total_informado: number | null;
+        capturado_em?: string | null;
+        desatualizado?: boolean;
+    } | null;
+    mais_vendidos: ProdutoPerfil[] | null;
+    mais_vendidos_em?: string | null;
+    mais_anunciados: ProdutoPerfil[];
+    anuncios_destaque: AnuncioPerfil[];
+}
+
+export interface RadarTag {
+    id: number;
+    name: string;
+    color: string;
 }
 
 export interface RadarEvent {
@@ -139,9 +237,57 @@ export async function podeVerRadar(): Promise<boolean> {
 // ─── Leitura ───
 
 export async function listarLojas(): Promise<RadarStore[]> {
-    const { data, error } = await db.from("radar_stores").select("*").order("niche").order("domain");
-    if (error) throw erro("listar lojas", error);
+    type Linha = RadarStore & { radar_store_tags?: { tag_id: number }[] };
+    const comTags = () => db.from("radar_stores").select("*, radar_store_tags(tag_id)").order("niche").order("domain");
+    let linhas: Linha[];
+    try {
+        linhas = (await paginar<Linha>("listar lojas", comTags, 20000)).linhas;
+    } catch (e) {
+        // Banco ainda sem a v2 (tags): lista as lojas sem tags em vez de quebrar a tela.
+        if (!(e instanceof Error) || !/radar_store_tags|relationship|PGRST200/i.test(e.message)) throw e;
+        const semTags = () => db.from("radar_stores").select("*").order("niche").order("domain");
+        linhas = (await paginar<Linha>("listar lojas", semTags, 20000)).linhas;
+    }
+    return linhas.map(({ radar_store_tags, ...s }) => ({
+        ...s,
+        notes: s.notes ?? null,
+        rating: s.rating ?? null,
+        potential: s.potential ?? null,
+        potential_detail: s.potential_detail ?? null,
+        profile: s.profile ?? null,
+        profile_at: s.profile_at ?? null,
+        tag_ids: (radar_store_tags ?? []).map((t) => t.tag_id),
+    }));
+}
+
+export async function listarTags(): Promise<RadarTag[]> {
+    const { data, error } = await db.from("radar_tags").select("id, name, color").order("name");
+    if (error) {
+        if (/radar_tags|does not exist|PGRST205/i.test(error.message ?? "")) return []; // banco ainda sem a v2
+        throw erro("listar tags", error);
+    }
     return data ?? [];
+}
+
+// Todos os anúncios ativos da loja (último snapshot), pra galeria da ficha.
+export async function listarAnunciosDaLoja(storeId: string): Promise<AnuncioPerfil[]> {
+    const { data, error } = await db.from("radar_snapshots").select("data, captured_at").eq("store_id", storeId).eq("kind", "ads").maybeSingle();
+    if (error) throw erro("ler anúncios da loja", error);
+    const anuncios = (data?.data?.anuncios ?? {}) as Record<string, { s: string | null; m: AnuncioPerfil["midia"]; l: string; b: string; n: number; c: string }>;
+    // Dias contados na data da coleta, com a mesma conta do coletor: bate com "Rodando 30+ dias".
+    const hoje = data?.captured_at ? new Date(data.captured_at).getTime() : Date.now();
+    return Object.entries(anuncios)
+        .map(([id, a]) => ({
+            id,
+            inicio: a.s,
+            dias: a.s ? Math.floor((hoje - new Date(a.s).getTime()) / 864e5) : null,
+            midia: a.m,
+            capa: a.c || null,
+            texto: a.b || null,
+            link: a.l || null,
+            variantes: a.n,
+        }))
+        .sort((x, y) => (y.dias ?? -1) - (x.dias ?? -1));
 }
 
 export interface FiltroEventos {
@@ -210,14 +356,12 @@ export async function listarBuscas(): Promise<RadarSearch[]> {
     return data ?? [];
 }
 
+// Sem teto: a busca traz todas as lojas que apareceram.
 export async function listarCandidatas(searchId: number): Promise<RadarCandidate[]> {
-    const { data, error } = await db
-        .from("radar_candidates")
-        .select("*")
-        .eq("search_id", searchId)
-        .order("ads_active", { ascending: false, nullsFirst: false });
-    if (error) throw erro("listar candidatas", error);
-    return data ?? [];
+    const montar = () =>
+        db.from("radar_candidates").select("*").eq("search_id", searchId).order("ads_active", { ascending: false, nullsFirst: false }).order("id");
+    const { linhas } = await paginar<RadarCandidate>("listar candidatas", montar, 50000);
+    return linhas;
 }
 
 // ─── Escrita ───
@@ -235,6 +379,59 @@ export async function adicionarLoja(entrada: NovaLoja, origem: RadarStore["sourc
 export async function alternarLoja(id: string, active: boolean) {
     const { error } = await db.from("radar_stores").update({ active }).eq("id", id);
     if (error) throw erro(active ? "reativar loja" : "pausar loja", error);
+}
+
+// Edição manual da loja pelos sócios (nota, anotação, nicho).
+export const edicaoLojaSchema = z.object({
+    rating: z.number().int().min(1).max(5).nullable().optional(),
+    notes: z.string().max(5000, "Anotação muito longa").nullable().optional(),
+    niche: nichoSchema.optional(),
+});
+export async function editarLoja(id: string, patch: z.infer<typeof edicaoLojaSchema>) {
+    const dados = edicaoLojaSchema.parse(patch);
+    const { error } = await db.from("radar_stores").update(dados).eq("id", id);
+    if (error) throw erro("salvar loja", error);
+}
+
+// ─── Tags ───
+
+export const CORES_TAG = ["#71717a", "#2563eb", "#16a34a", "#d97706", "#dc2626", "#7c3aed", "#db2777", "#0891b2"];
+
+export const tagSchema = z.object({
+    name: z.string().trim().min(1, "Dê um nome à tag").max(40, "Máximo 40 caracteres"),
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+});
+
+export async function criarTag(entrada: z.infer<typeof tagSchema>): Promise<RadarTag> {
+    const tag = tagSchema.parse(entrada);
+    const { data, error } = await db.from("radar_tags").insert(tag).select("id, name, color").single();
+    if (error) {
+        if (error.code === "23505") throw new Error(`Já existe a tag "${tag.name}"`);
+        throw erro("criar tag", error);
+    }
+    return data;
+}
+
+export async function editarTag(id: number, entrada: z.infer<typeof tagSchema>) {
+    const tag = tagSchema.parse(entrada);
+    const { error } = await db.from("radar_tags").update(tag).eq("id", id);
+    if (error) {
+        if (error.code === "23505") throw new Error(`Já existe a tag "${tag.name}"`);
+        throw erro("editar tag", error);
+    }
+}
+
+export async function apagarTag(id: number) {
+    const { error } = await db.from("radar_tags").delete().eq("id", id);
+    if (error) throw erro("apagar tag", error);
+}
+
+export async function alternarTagDaLoja(storeId: string, tagId: number, ligar: boolean) {
+    const q = ligar
+        ? db.from("radar_store_tags").upsert({ store_id: storeId, tag_id: tagId }, { onConflict: "store_id,tag_id", ignoreDuplicates: true })
+        : db.from("radar_store_tags").delete().eq("store_id", storeId).eq("tag_id", tagId);
+    const { error } = await q;
+    if (error) throw erro(ligar ? "colocar tag" : "tirar tag", error);
 }
 
 export async function criarBusca(entrada: NovaBusca) {

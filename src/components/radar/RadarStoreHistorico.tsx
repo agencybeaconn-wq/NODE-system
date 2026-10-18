@@ -1,0 +1,97 @@
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
+import { listarEventos, listarMetricas, type RadarStore } from "./radarApi";
+import { dataCurta, diasAtras } from "./radarUtils";
+
+const grafico = {
+    ads_active: { label: "Anúncios ativos", color: "hsl(var(--primary))" },
+    products: { label: "Produtos", color: "hsl(var(--muted-foreground))" },
+} satisfies ChartConfig;
+
+export function RadarStoreHistorico({ store }: { store: RadarStore }) {
+    const desde = diasAtras(90);
+    const metricas = useQuery({ queryKey: ["radar_metrics", store.id, desde], queryFn: () => listarMetricas(desde, store.id) });
+    const eventos = useQuery({
+        queryKey: ["radar_events", "loja", store.id, desde],
+        queryFn: async () => (await listarEventos({ desde, storeId: store.id })).eventos,
+    });
+
+    const serie = useMemo(
+        () => (metricas.data ?? []).map((m) => ({ dia: dataCurta(m.day), ads_active: m.ads_active, products: m.products })),
+        [metricas.data],
+    );
+    const temAnuncios = serie.some((p) => p.ads_active != null);
+    const temProdutos = serie.some((p) => p.products != null);
+
+    return (
+        <div className="space-y-6">
+            <section className="space-y-2">
+                <h3 className="text-sm font-semibold">Últimos 90 dias</h3>
+                {metricas.isLoading ? (
+                    <Skeleton className="h-48 w-full rounded-xl" />
+                ) : serie.length < 2 ? (
+                    <p className="text-sm text-muted-foreground">O gráfico aparece a partir do segundo dia de coleta.</p>
+                ) : (
+                    <ChartContainer config={grafico} className="h-52 w-full">
+                        <LineChart data={serie} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
+                            <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                            <XAxis dataKey="dia" tickLine={false} axisLine={false} fontSize={11} />
+                            {temAnuncios && <YAxis yAxisId="ads" width={32} tickLine={false} axisLine={false} fontSize={11} allowDecimals={false} />}
+                            {temProdutos && <YAxis yAxisId="prod" orientation="right" width={40} tickLine={false} axisLine={false} fontSize={11} allowDecimals={false} />}
+                            <ChartTooltip content={<ChartTooltipContent />} />
+                            {temAnuncios && <Line yAxisId="ads" type="monotone" dataKey="ads_active" stroke="var(--color-ads_active)" strokeWidth={2} dot={false} connectNulls />}
+                            {temProdutos && <Line yAxisId="prod" type="monotone" dataKey="products" stroke="var(--color-products)" strokeWidth={1.5} strokeDasharray="4 3" dot={false} connectNulls />}
+                        </LineChart>
+                    </ChartContainer>
+                )}
+            </section>
+
+            <section className="space-y-2">
+                <h3 className="text-sm font-semibold">Linha do tempo</h3>
+                {eventos.isLoading && <Skeleton className="h-32 w-full rounded-xl" />}
+                {eventos.error && <p className="text-sm text-destructive">{(eventos.error as Error).message}</p>}
+                {!eventos.isLoading && (eventos.data ?? []).length === 0 && (
+                    <p className="text-sm text-muted-foreground">Nenhuma mudança registrada ainda. A primeira coleta é a linha de base.</p>
+                )}
+                <ol className="space-y-3 border-l border-border pl-4">
+                    {(eventos.data ?? []).map((e) => (
+                        <li key={e.id} className="relative">
+                            <span className={cn("absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-background", e.importance === 3 ? "bg-primary" : e.importance === 2 ? "bg-primary/60" : "bg-muted-foreground/40")} />
+                            <p className="text-xs text-muted-foreground">{dataCurta(e.occurred_on)}</p>
+                            <p className="text-sm text-foreground">{e.title}</p>
+                            <EventoDetalhe detail={e.detail} />
+                        </li>
+                    ))}
+                </ol>
+            </section>
+        </div>
+    );
+}
+
+// Mostra até 3 exemplos (produto, anúncio ou texto) que o coletor guardou no evento.
+function EventoDetalhe({ detail }: { detail: Record<string, unknown> | null }) {
+    const exemplos = Array.isArray(detail?.exemplos) ? (detail!.exemplos as Record<string, unknown>[]).slice(0, 3) : [];
+    const depois = typeof detail?.depois === "string" ? detail.depois : null;
+    if (!exemplos.length && !depois) return null;
+    return (
+        <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+            {depois && <p className="line-clamp-2">“{depois}”</p>}
+            {exemplos.map((x, i) => {
+                // mudança de preço grava "para"; "de/por" ligado grava "por"
+                const para = x.para ?? x.por;
+                return (
+                    <p key={i} className="line-clamp-1">
+                        {String(x.titulo ?? x.texto ?? x.link ?? "")}
+                        {x.preco != null ? ` · ${x.preco}` : ""}
+                        {x.de != null && para != null ? ` · ${x.de} → ${para}` : ""}
+                        {x.midia ? ` · ${x.midia === "video" ? "vídeo" : "imagem"}` : ""}
+                    </p>
+                );
+            })}
+        </div>
+    );
+}
