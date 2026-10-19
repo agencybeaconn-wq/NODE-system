@@ -163,7 +163,12 @@ export interface RadarSearch {
     status: "pending" | "running" | "done" | "error";
     created_at: string;
     finished_at: string | null;
-    result: { anuncios_lidos?: number; dominios?: number; candidatas?: number } | null;
+    // Enquanto roda, o coletor grava o progresso aqui (em_andamento, etapa, termo, cartoes).
+    result: {
+        anuncios_lidos?: number; dominios?: number; candidatas?: number; parcial?: boolean;
+        em_andamento?: boolean; etapa?: string; termo?: string; termo_n?: number; termos?: number; cartoes?: number;
+    } | null;
+    started_at?: string | null;
     error: string | null;
 }
 
@@ -349,7 +354,7 @@ export async function listarUltimasExecucoes(desde: string): Promise<RadarRun[]>
 export async function listarBuscas(): Promise<RadarSearch[]> {
     const { data, error } = await db
         .from("radar_searches")
-        .select("id, term, country, niche, status, created_at, finished_at, result, error")
+        .select("id, term, country, niche, status, created_at, started_at, finished_at, result, error")
         .order("created_at", { ascending: false })
         .limit(30);
     if (error) throw erro("listar buscas", error);

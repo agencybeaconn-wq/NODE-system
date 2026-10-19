@@ -3,7 +3,34 @@ import { useState } from "react";
 import { Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { NivelPotencial, RadarTag } from "./radarApi";
+import { SERVICOS, type Servico } from "./prospectApi";
 import { NIVEL_INFO } from "./radarUtils";
+
+// Liga/desliga os serviços da NODE que cabem pro possível cliente.
+export function ServicosToggle({ valor, onMudar, disabled }: { valor: Servico[]; onMudar: (v: Servico[]) => void; disabled?: boolean }) {
+    return (
+        <div className="flex flex-wrap gap-1.5">
+            {(Object.keys(SERVICOS) as Servico[]).map((s) => {
+                const ligado = valor.includes(s);
+                return (
+                    <button
+                        key={s}
+                        type="button"
+                        aria-pressed={ligado}
+                        disabled={disabled}
+                        onClick={() => onMudar(ligado ? valor.filter((x) => x !== s) : [...valor, s])}
+                        className={cn(
+                            "rounded-full border px-3 py-1 text-xs transition-colors active:scale-[0.97] disabled:opacity-60",
+                            ligado ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90" : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground",
+                        )}
+                    >
+                        {SERVICOS[s]}
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
 
 export function PotencialAnel({ score, nivel, tamanho = 52 }: { score: number | null; nivel: NivelPotencial; tamanho?: number }) {
     const raio = 20;

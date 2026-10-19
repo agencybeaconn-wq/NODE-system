@@ -13,6 +13,7 @@ import { RadarFeed } from "@/components/radar/RadarFeed";
 import { RadarStoresGrid } from "@/components/radar/RadarStoresGrid";
 import { RadarTagManager } from "@/components/radar/RadarTagManager";
 import { RadarSearchPanel } from "@/components/radar/RadarSearchPanel";
+import { RadarProspectsPanel } from "@/components/radar/RadarProspectsPanel";
 import { RadarStoreSheet } from "@/components/radar/RadarStoreSheet";
 
 export default function RadarPage() {
@@ -67,6 +68,7 @@ export default function RadarPage() {
                     <TabsTrigger value="lojas">Lojas</TabsTrigger>
                     <TabsTrigger value="feed">O que mudou</TabsTrigger>
                     <TabsTrigger value="busca">Buscar lojas</TabsTrigger>
+                    <TabsTrigger value="clientes">Clientes NODE</TabsTrigger>
                 </TabsList>
                 <TabsContent value="feed">
                     <RadarFeed stores={lojas.data ?? []} niche={nicho} onOpenStore={abrir} />
@@ -84,6 +86,9 @@ export default function RadarPage() {
                 </TabsContent>
                 <TabsContent value="busca">
                     <RadarSearchPanel niches={nichos} />
+                </TabsContent>
+                <TabsContent value="clientes">
+                    <RadarProspectsPanel />
                 </TabsContent>
             </Tabs>
 

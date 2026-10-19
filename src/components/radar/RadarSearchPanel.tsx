@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Loader2, Search, X } from "lucide-react";
+import { Check, Loader2, Search, UserPlus, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,9 +13,19 @@ import {
     acompanharCandidata, criarBusca, listarBuscas, listarCandidatas, marcarCandidata, novaBuscaSchema,
     type RadarCandidate, type RadarSearch,
 } from "./radarApi";
+import { prospectDeCandidata } from "./prospectApi";
 import { NICHOS_SUGERIDOS, PAISES, PLATAFORMAS, dataHora } from "./radarUtils";
 
 const OUTRO = "__outro__";
+
+// Linha de progresso que o coletor grava enquanto a busca roda.
+function progresso(b: RadarSearch): string | null {
+    const r = b.result;
+    if (b.status !== "running" || !r?.em_andamento) return null;
+    if (r.etapa === "avaliando lojas") return `avaliando lojas: ${r.candidatas ?? 0} de ${r.dominios ?? "?"}`;
+    if (r.termo) return `termo ${r.termo_n}/${r.termos} "${r.termo}": ${r.cartoes ?? 0} anúncios`;
+    return null;
+}
 
 const STATUS_BUSCA: Record<RadarSearch["status"], string> = {
     pending: "na fila",
@@ -92,6 +102,15 @@ export function RadarSearchPanel({ niches }: RadarSearchPanelProps) {
         onError: (e: Error) => toast({ variant: "destructive", title: "Erro", description: e.message }),
     });
 
+    const cliente = useMutation({
+        mutationFn: prospectDeCandidata,
+        onSuccess: (_, c) => {
+            toast({ title: `${c.domain} em Clientes NODE`, description: "Entrou com criativo, motion e funil marcados; ajuste na ficha." });
+            queryClient.invalidateQueries({ queryKey: ["radar_prospects"] });
+        },
+        onError: (e: Error) => toast({ variant: "destructive", title: "Não virou cliente", description: e.message }),
+    });
+
     const trocarNicho = (v: string) => {
         setNichoSel(v);
         if (v !== OUTRO && NICHOS_SUGERIDOS[v]) setTermo(NICHOS_SUGERIDOS[v]);
@@ -155,7 +174,7 @@ export function RadarSearchPanel({ niches }: RadarSearchPanelProps) {
                             >
                                 <span className="min-w-0">
                                     <span className="block truncate text-sm font-medium">{b.niche} · {b.country}</span>
-                                    <span className="block truncate text-xs text-muted-foreground">{b.term}</span>
+                                    <span className="block truncate text-xs text-muted-foreground">{progresso(b) ?? b.term}</span>
                                 </span>
                                 <span className="shrink-0 text-right text-xs text-muted-foreground">
                                     <span className="flex items-center justify-end gap-1">
@@ -177,6 +196,8 @@ export function RadarSearchPanel({ niches }: RadarSearchPanelProps) {
                         const b = buscas.data?.find((x) => x.id === buscaAberta);
                         if (!b) return null;
                         if (b.status === "error") return <p className="text-sm text-destructive">{b.error}</p>;
+                        const andamento = progresso(b);
+                        if (andamento) return <p className="text-sm text-muted-foreground">Buscando: {andamento}. Cada termo lê no máximo 600 anúncios e a busca toda leva até 25 min.</p>;
                         if (b.result) return <p className="text-sm text-muted-foreground">{b.result.anuncios_lidos} anúncios lidos, {b.result.dominios} domínios, {b.result.candidatas} lojas avaliadas.</p>;
                         return null;
                     })()}
@@ -189,7 +210,7 @@ export function RadarSearchPanel({ niches }: RadarSearchPanelProps) {
                                 <TableHead>Plataforma</TableHead>
                                 <TableHead className="text-right">Anúncios na busca</TableHead>
                                 <TableHead>Exemplo de anúncio</TableHead>
-                                <TableHead className="w-44" />
+                                <TableHead className="w-56" />
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -220,6 +241,9 @@ export function RadarSearchPanel({ niches }: RadarSearchPanelProps) {
                                             <div className="flex justify-end gap-1.5">
                                                 <Button size="sm" onClick={() => acao.mutate({ c, tipo: "add" })} disabled={acao.isPending}>
                                                     <Check className="mr-1 h-3.5 w-3.5" /> Acompanhar
+                                                </Button>
+                                                <Button size="sm" variant="outline" title="Virar possível cliente da NODE (aba Clientes NODE)" aria-label="Virar possível cliente" onClick={() => cliente.mutate(c)} disabled={cliente.isPending}>
+                                                    <UserPlus className="h-3.5 w-3.5" />
                                                 </Button>
                                                 <Button size="sm" variant="ghost" aria-label="Descartar" onClick={() => acao.mutate({ c, tipo: "dismiss" })} disabled={acao.isPending}>
                                                     <X className="h-3.5 w-3.5" />
