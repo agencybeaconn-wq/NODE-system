@@ -15,6 +15,36 @@ import { PotencialAnel, ServicosToggle } from "./RadarBits";
 import { fmtNumero } from "./radarUtils";
 import { nivelProspect, linkWhatsApp } from "./prospectUtils";
 
+// "Por que 70": cada parte da nota com o motivo, na ordem do que mais pesa.
+function NotaExplicada({ p }: { p: RadarProspect }) {
+    if (!p.score_detail?.length) {
+        return p.score == null ? null : (
+            <p className="text-xs text-muted-foreground">Nota {p.score}: veio de antes do detalhamento ou foi cadastrado na mão.</p>
+        );
+    }
+    return (
+        <section className="space-y-3 rounded-2xl border border-border/60 p-4">
+            <h3 className="text-sm font-semibold">Por que {p.score}</h3>
+            <ul className="space-y-2.5">
+                {p.score_detail.map((parte) => (
+                    <li key={parte.chave} className="space-y-1">
+                        <div className="flex items-baseline justify-between gap-3 text-sm">
+                            <span>{parte.rotulo}</span>
+                            <span className="shrink-0 tabular-nums text-muted-foreground">
+                                <span className="font-semibold text-foreground">{parte.pontos}</span> de {parte.max}
+                            </span>
+                        </div>
+                        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                            <div className="h-full origin-left rounded-full bg-primary" style={{ transform: `scaleX(${parte.max ? parte.pontos / parte.max : 0})` }} />
+                        </div>
+                        <p className="text-xs text-muted-foreground">{parte.motivo}</p>
+                    </li>
+                ))}
+            </ul>
+        </section>
+    );
+}
+
 interface RadarProspectSheetProps {
     prospect: RadarProspect | null;
     onClose: () => void;
@@ -82,6 +112,8 @@ export function RadarProspectSheet({ prospect: p, onClose }: RadarProspectSheetP
                                 {p.address && <p className="truncate text-xs text-muted-foreground">{p.address}</p>}
                             </div>
                         </div>
+
+                        <NotaExplicada p={p} />
 
                         <div className="flex flex-wrap gap-2">
                             {whatsapp && (

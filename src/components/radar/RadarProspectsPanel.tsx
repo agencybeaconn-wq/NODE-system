@@ -2,8 +2,14 @@
 // Biblioteca de Anúncios (aba "Buscar lojas") ou cadastrados na mão.
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, MapPin, Plus, Search, Star, X } from "lucide-react";
+import { Info, Loader2, MapPin, Plus, Search, Star, Trash2, X } from "lucide-react";
+import {
+    AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+    AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -13,7 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
     SEGMENTOS_SUGERIDOS, SERVICOS, STATUS_PROSPECT, TIPO_SITE,
-    buscaGoogleSchema, criarProspect, enfileirarBuscaMaps, listarBuscasGoogle, listarProspects,
+    apagarBuscaGoogle, buscaGoogleSchema, criarProspect, enfileirarBuscaMaps, intocado, listarBuscasGoogle, listarProspects,
     type BuscaGoogle, type RadarProspect, type Servico, type StatusProspect, type TipoSite,
 } from "./prospectApi";
 import { PotencialAnel, ServicosToggle } from "./RadarBits";
@@ -113,6 +119,26 @@ export function RadarProspectsPanel() {
         onError: (e: Error) => toast({ variant: "destructive", title: "Não deu pra buscar", description: e.message }),
     });
 
+    const [apagando, setApagando] = useState<BuscaGoogle | null>(null);
+    const [levarClientes, setLevarClientes] = useState(false);
+    const intocadosDaBusca = useMemo(
+        () => (apagando ? (prospects.data ?? []).filter((p) => p.search_id === apagando.id && intocado(p)).length : 0),
+        [apagando, prospects.data],
+    );
+    const apagar = useMutation({
+        mutationFn: () => apagarBuscaGoogle(apagando!.id, levarClientes && intocadosDaBusca > 0),
+        onSuccess: () => {
+            toast({ title: "Busca apagada", description: levarClientes && intocadosDaBusca ? `${intocadosDaBusca} clientes não trabalhados saíram junto.` : undefined });
+            if (fBusca === apagando?.id) setFBusca(null);
+            setApagando(null);
+        },
+        onError: (e: Error) => toast({ variant: "destructive", title: "Não apagou", description: e.message }),
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ["radar_prospect_searches"] });
+            queryClient.invalidateQueries({ queryKey: ["radar_prospects"] });
+        },
+    });
+
     const trocarSegmento = (v: string) => {
         setSegSel(v);
         if (v === OUTRO) setTermo("");
@@ -178,24 +204,33 @@ export function RadarProspectsPanel() {
                     <div className="divide-y divide-border/60">
                         {(buscas.data ?? []).length === 0 && <p className="px-6 pb-5 text-sm text-muted-foreground">Nenhuma busca ainda.</p>}
                         {(buscas.data ?? []).map((b) => (
-                            <button
-                                key={b.id}
-                                type="button"
-                                onClick={() => setFBusca(fBusca === b.id ? null : b.id)}
-                                className={cn(
-                                    "flex w-full items-center justify-between gap-3 px-6 py-3 text-left transition-colors hover:bg-muted/50 active:bg-muted",
-                                    fBusca === b.id && "bg-muted/60",
+                            <div key={b.id} className={cn("group flex items-center transition-colors hover:bg-muted/50", fBusca === b.id && "bg-muted/60")}>
+                                <button
+                                    type="button"
+                                    onClick={() => setFBusca(fBusca === b.id ? null : b.id)}
+                                    className="flex min-w-0 flex-1 items-center justify-between gap-3 py-3 pl-6 pr-2 text-left active:bg-muted"
+                                >
+                                    <span className="min-w-0">
+                                        <span className="block truncate text-sm font-medium">{b.segment} · {b.city}</span>
+                                        <span className={cn("block truncate text-xs", b.status === "error" ? "text-destructive" : "text-muted-foreground")}>{resumoBusca(b)}</span>
+                                    </span>
+                                    <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                                        {emAndamento(b) && <Loader2 className="h-3 w-3 animate-spin" />}
+                                        {dataHora(b.created_at)}
+                                    </span>
+                                </button>
+                                {b.status !== "running" && (
+                                    <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="mr-3 h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                                        aria-label={`Apagar busca ${b.segment} em ${b.city}`}
+                                        onClick={() => { setLevarClientes(false); setApagando(b); }}
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
                                 )}
-                            >
-                                <span className="min-w-0">
-                                    <span className="block truncate text-sm font-medium">{b.segment} · {b.city}</span>
-                                    <span className={cn("block truncate text-xs", b.status === "error" ? "text-destructive" : "text-muted-foreground")}>{resumoBusca(b)}</span>
-                                </span>
-                                <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-                                    {emAndamento(b) && <Loader2 className="h-3 w-3 animate-spin" />}
-                                    {dataHora(b.created_at)}
-                                </span>
-                            </button>
+                            </div>
                         ))}
                     </div>
                 </Card>
@@ -247,7 +282,24 @@ export function RadarProspectsPanel() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="w-14">Nota</TableHead>
+                                <TableHead className="w-24">
+                                    <Popover>
+                                        <PopoverTrigger className="inline-flex items-center gap-1 rounded-md transition-colors hover:text-foreground active:opacity-70">
+                                            Potencial <Info className="h-3.5 w-3.5" />
+                                        </PopoverTrigger>
+                                        <PopoverContent align="start" className="w-80 space-y-2 text-sm">
+                                            <p className="font-semibold">Como a nota funciona (0 a 100)</p>
+                                            <p className="text-muted-foreground">Quanto mais alto, mais o negócio precisa do que a NODE vende e mais fácil é chamar.</p>
+                                            <ul className="space-y-1 text-xs">
+                                                <li><b>Presença, até 45:</b> sem site 45 · só Instagram ou agendamento 40 · site grátis 20 · site próprio 5</li>
+                                                <li><b>Contato, até 15:</b> celular (WhatsApp) 15 · só fixo 8</li>
+                                                <li><b>Estrelas, até 10:</b> 4,5 ou mais 10 · 4,0 a 4,4 6</li>
+                                                <li><b>Avaliações, até 30:</b> o Google Maps sem login não mostra, então hoje fica 0</li>
+                                            </ul>
+                                            <p className="text-xs text-muted-foreground">Ex.: sem site + celular + 4,9 estrelas = 45 + 15 + 10 = 70. Clique no negócio pra ver o detalhe dele.</p>
+                                        </PopoverContent>
+                                    </Popover>
+                                </TableHead>
                                 <TableHead>Negócio</TableHead>
                                 <TableHead>Presença</TableHead>
                                 <TableHead className="text-right">Google</TableHead>
@@ -275,6 +327,35 @@ export function RadarProspectsPanel() {
             </Card>
 
             <RadarProspectSheet prospect={aberto} onClose={() => setAbertoId(null)} />
+            <AlertDialog open={!!apagando} onOpenChange={(v) => !v && setApagando(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Apagar a busca {apagando?.segment} · {apagando?.city}?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Some da lista de buscas. Os possíveis clientes que ela achou continuam, a menos que você marque abaixo.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    {intocadosDaBusca > 0 && (
+                        <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-border/60 p-3 text-sm">
+                            <Checkbox checked={levarClientes} onCheckedChange={(v) => setLevarClientes(v === true)} className="mt-0.5" />
+                            <span>
+                                Apagar também os {intocadosDaBusca} clientes dela que ninguém mexeu
+                                <span className="block text-xs text-muted-foreground">Os que têm anotação, mudaram de situação ou foram pro Comercial ficam.</span>
+                            </span>
+                        </label>
+                    )}
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={(e) => { e.preventDefault(); apagar.mutate(); }}
+                            disabled={apagar.isPending}
+                        >
+                            {apagar.isPending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}Apagar
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
             <NovoProspectDialog open={novoAberto} onOpenChange={setNovoAberto} segmentos={segmentos} />
         </div>
     );

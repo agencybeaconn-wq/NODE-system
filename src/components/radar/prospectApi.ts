@@ -66,6 +66,14 @@ export const SEGMENTOS_SUGERIDOS: Record<string, string> = {
     "fotografia": "fotógrafo",
 };
 
+export interface ParteNota {
+    chave: "presenca" | "contato" | "reputacao" | "tracao";
+    rotulo: string;
+    pontos: number;
+    max: number;
+    motivo: string;
+}
+
 export interface RadarProspect {
     id: string;
     name: string;
@@ -87,6 +95,8 @@ export interface RadarProspect {
     services: Servico[];
     status: StatusProspect;
     score: number | null;
+    // Motivo de cada ponto da nota, gravado pelo coletor (NODE-Radar/lib/prospect.mjs).
+    score_detail: ParteNota[] | null;
     notes: string | null;
     source: "google" | "anuncios" | "manual";
     search_id: number | null;
@@ -191,6 +201,35 @@ export async function enfileirarBuscaMaps(entrada: NovaBuscaGoogle) {
     const { data: auth } = await supabase.auth.getUser();
     const { error } = await db.from("radar_prospect_searches").insert({ ...busca, requested_by: auth.user?.id ?? null });
     if (error) throw erro("enfileirar busca no Maps", error);
+}
+
+// Possível cliente que ninguém mexeu ainda: pode sair junto com a busca.
+export const intocado = (p: RadarProspect) => p.status === "novo" && !p.notes && !p.crm_lead_id;
+
+// Apaga a busca (o banco recusa a que está rodando). Com `levarClientes`, apaga
+// antes os clientes dela que ninguém mexeu; os trabalhados ficam na lista.
+// Os ids saem antes (apagar a busca desliga o vínculo) e só são apagados se a busca saiu.
+export async function apagarBuscaGoogle(id: number, levarClientes: boolean) {
+    let ids: string[] = [];
+    if (levarClientes) {
+        const { data, error } = await db
+            .from("radar_prospects")
+            .select("id")
+            .eq("search_id", id)
+            .eq("status", "novo")
+            .is("notes", null)
+            .is("crm_lead_id", null);
+        if (error) throw erro("ler clientes da busca", error);
+        ids = (data ?? []).map((p: { id: string }) => p.id);
+    }
+    const { data, error } = await db.from("radar_prospect_searches").delete().eq("id", id).select("id");
+    if (error) throw erro("apagar busca", error);
+    if (!(data ?? []).length) throw new Error("A busca está rodando agora; espere terminar pra apagar.");
+    if (ids.length) {
+        // O status entra de novo no filtro: quem mexeu num deles nesse meio-tempo, mantém.
+        const { error: e } = await db.from("radar_prospects").delete().in("id", ids).eq("status", "novo").is("notes", null).is("crm_lead_id", null);
+        if (e) throw erro("apagar clientes da busca", e);
+    }
 }
 
 export async function editarProspect(id: string, patch: z.input<typeof edicaoProspectSchema>) {
