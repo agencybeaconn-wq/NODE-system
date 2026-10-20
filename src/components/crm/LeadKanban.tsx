@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, Fragment } from "react";
 import { CrmLead, KanbanColumn } from "@/pages/Comercial";
+import type { TeamMember } from "@/hooks/useAgencyTeam";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,9 +42,10 @@ interface LeadKanbanProps {
     onColumnsChanged: () => void;
     onColumnsReordered: (newColumns: KanbanColumn[]) => void;
     onEditColumn: (column: KanbanColumn) => void;
+    membros?: TeamMember[];
 }
 
-export function LeadKanban({ leads, columns, isLoading, onEditLead, onDeleteLead, onArchiveLead, onLeadMoved, onColumnsChanged, onColumnsReordered }: LeadKanbanProps) {
+export function LeadKanban({ leads, columns, isLoading, onEditLead, onDeleteLead, onArchiveLead, onLeadMoved, onColumnsChanged, onColumnsReordered, membros = [] }: LeadKanbanProps) {
     const { workspaceId } = useDashboard();
     const [draggedLead, setDraggedLead] = useState<CrmLead | null>(null);
     const [targetTask, setTargetTask] = useState<string | null>(null);
@@ -385,6 +387,13 @@ export function LeadKanban({ leads, columns, isLoading, onEditLead, onDeleteLead
                                                         <div className="flex items-center gap-2 text-[11px] text-muted-foreground/80">
                                                             <Store className="h-3 w-3 shrink-0 opacity-70" />
                                                             <span className="truncate">{lead.store_name}</span>
+                                                        </div>
+                                                    )}
+
+                                                    {(lead.segment || lead.owner_id) && (
+                                                        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                                                            {lead.segment && <span className="rounded-md bg-muted px-1.5 py-0.5">{lead.segment}</span>}
+                                                            {lead.owner_id && <span className="truncate">{membros.find((m) => m.user_id === lead.owner_id)?.profile?.full_name?.split(" ")[0] ?? ""}</span>}
                                                         </div>
                                                     )}
 

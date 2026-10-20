@@ -295,6 +295,9 @@ export async function levarProComercial(p: RadarProspect, workspaceId: string) {
         p.maps_url ? `Maps: ${p.maps_url}` : null,
         p.notes ? `\n${p.notes}` : null,
     ].filter(Boolean);
+    const { data: auth } = await supabase.auth.getUser();
+    // O kanban entende Quente/Morno/Frio; mesmas faixas do anel do Radar (prospectUtils).
+    const temperatura = p.score == null ? null : p.score >= 70 ? "Quente" : p.score >= 45 ? "Morno" : "Frio";
     const { data: lead, error } = await supabase
         .from("crm_leads")
         .insert({
@@ -304,7 +307,9 @@ export async function levarProComercial(p: RadarProspect, workspaceId: string) {
             phone: p.phone,
             site_url: p.website,
             product_interest: servicos || null,
-            lead_score: p.score != null ? String(p.score) : null,
+            lead_score: temperatura,
+            segment: p.segment,
+            owner_id: auth.user?.id ?? null,
             observations: linhas.join("\n"),
             utm_source: "radar-clientes",
             ...(coluna ? { column_id: coluna.id, lead_status: coluna.title.toLowerCase().replace(/\s+/g, "_") } : {}),

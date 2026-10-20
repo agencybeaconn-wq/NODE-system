@@ -1,7 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
-import { Plus, Trash2, AlertTriangle, Trophy, TrendingUp, Settings, Phone, Check } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useAgencyTeam } from "@/hooks/useAgencyTeam";
+import { Plus, Trash2, AlertTriangle, Trophy, TrendingUp, Settings, Phone, Check, PhoneCall, Columns3 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CallMode, PlacarDoDia } from "@/components/crm/CallMode";
+import { cn } from "@/lib/utils";
 import {
     Popover,
     PopoverContent,
@@ -61,7 +66,27 @@ export interface CrmLead {
     utm_term?: string | null;
     landing_page?: string | null;
     referrer?: string | null;
+    // CRM v2 (modo ligação)
+    segment?: string | null;
+    owner_id?: string | null;
+    next_contact_at?: string | null;
+    last_contact_at?: string | null;
+    contact_attempts?: number;
+    last_outcome?: string | null;
 }
+
+type Visao = "ligar" | "kanban";
+const TODOS = "__todos__";
+const SEM = "__sem__";
+const MEUS = "__meus__";
+
+const lerVisao = (): Visao => {
+    try {
+        return localStorage.getItem("crm_visao") === "kanban" ? "kanban" : "ligar";
+    } catch {
+        return "ligar";
+    }
+};
 
 export default function Comercial() {
     const { workspaceId } = useDashboard();
@@ -76,6 +101,24 @@ export default function Comercial() {
     const [isRankingOpen, setIsRankingOpen] = useState(false);
     const [comercialPhone, setComercialPhone] = useState(() => localStorage.getItem('lever_comercial_phone') || '+55 31 99519-4872');
     const [phoneEditing, setPhoneEditing] = useState(false);
+    const { user } = useAuth();
+    const { members } = useAgencyTeam();
+    const [visao, setVisaoState] = useState<Visao>(lerVisao);
+    const [fNicho, setFNicho] = useState(TODOS);
+    const [fDono, setFDono] = useState(TODOS);
+    const setVisao = (v: Visao) => {
+        setVisaoState(v);
+        try { localStorage.setItem("crm_visao", v); } catch { /* preferência só deste navegador */ }
+    };
+
+    const nichos = useMemo(() => [...new Set(leads.map((l) => l.segment).filter((s): s is string => !!s))].sort(), [leads]);
+    // Nicho e responsável valem pras duas visões (ligar e kanban): camisa não mistura com o resto.
+    const leadsFiltrados = useMemo(() => leads.filter((l) => {
+        if (fNicho === SEM ? !!l.segment : fNicho !== TODOS && l.segment !== fNicho) return false;
+        if (fDono === MEUS) return l.owner_id === user?.id;
+        if (fDono === SEM) return !l.owner_id;
+        return fDono === TODOS || l.owner_id === fDono;
+    }), [leads, fNicho, fDono, user?.id]);
 
     const handleSavePhone = () => {
         localStorage.setItem('lever_comercial_phone', comercialPhone);
@@ -292,9 +335,62 @@ export default function Comercial() {
                 )}
             </div>
 
+            <div className="mb-4 flex shrink-0 flex-col gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                    <div className="inline-flex rounded-xl border border-border bg-secondary/40 p-1" role="tablist" aria-label="Visão">
+                        {([["ligar", "Ligar"], ["kanban", "Kanban"]] as const).map(([v, rotulo]) => (
+                            <button
+                                key={v}
+                                type="button"
+                                role="tab"
+                                aria-selected={visao === v}
+                                onClick={() => setVisao(v)}
+                                className={cn(
+                                    "flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-medium transition-colors active:scale-[0.98]",
+                                    visao === v ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
+                                )}
+                            >
+                                {v === "ligar" ? <PhoneCall className="h-3.5 w-3.5" /> : <Columns3 className="h-3.5 w-3.5" />}{rotulo}
+                            </button>
+                        ))}
+                    </div>
+                    <Select value={fNicho} onValueChange={setFNicho}>
+                        <SelectTrigger className="h-10 w-[180px]" aria-label="Nicho"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value={TODOS}>Todos os nichos</SelectItem>
+                            {nichos.map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}
+                            <SelectItem value={SEM}>Sem nicho</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <Select value={fDono} onValueChange={setFDono}>
+                        <SelectTrigger className="h-10 w-[180px]" aria-label="Responsável"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value={TODOS}>Todos os responsáveis</SelectItem>
+                            <SelectItem value={MEUS}>Meus leads</SelectItem>
+                            <SelectItem value={SEM}>Sem responsável</SelectItem>
+                            {members.filter((m) => m.user_id).map((m) => <SelectItem key={m.user_id} value={m.user_id}>{m.profile?.full_name || m.email}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                    <span className="text-sm tabular-nums text-muted-foreground">{leadsFiltrados.length} de {leads.length} leads</span>
+                </div>
+                {workspaceId && <PlacarDoDia workspaceId={workspaceId} membros={members} />}
+            </div>
+
+            {visao === "ligar" ? (
+                <div className="min-h-[560px] flex-1 lg:h-[calc(100vh-17rem)] lg:flex-none">
+                    <CallMode
+                        leads={leadsFiltrados}
+                        membros={members}
+                        userId={user?.id ?? null}
+                        nichos={nichos}
+                        onChanged={() => fetchData(false)}
+                        onEditLead={handleEditLead}
+                    />
+                </div>
+            ) : (
             <div className="flex-1 overflow-x-auto overflow-y-hidden pb-6">
                 <LeadKanban
-                    leads={leads}
+                    leads={leadsFiltrados}
                     columns={columns}
                     isLoading={isLoading}
                     onEditLead={handleEditLead}
@@ -304,8 +400,10 @@ export default function Comercial() {
                     onColumnsChanged={() => fetchData(false)}
                     onColumnsReordered={handleColumnsReordered}
                     onEditColumn={handleUpdateColumn}
+                    membros={members}
                 />
             </div>
+            )}
 
             <LeadModal
                 open={isModalOpen}

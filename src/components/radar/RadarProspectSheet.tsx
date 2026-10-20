@@ -13,7 +13,8 @@ import {
 } from "./prospectApi";
 import { PotencialAnel, ServicosToggle } from "./RadarBits";
 import { fmtNumero } from "./radarUtils";
-import { nivelProspect, linkWhatsApp } from "./prospectUtils";
+import { linkWhatsApp } from "@/lib/whatsapp";
+import { nivelProspect } from "./prospectUtils";
 
 // "Por que 70": cada parte da nota com o motivo, na ordem do que mais pesa.
 function NotaExplicada({ p }: { p: RadarProspect }) {
@@ -80,7 +81,7 @@ export function RadarProspectSheet({ prospect: p, onClose }: RadarProspectSheetP
         if (sujo && !window.confirm("A anotação não foi salva. Fechar mesmo assim?")) return;
         onClose();
     };
-    const whatsapp = p ? linkWhatsApp(p.phone, p.country) : null;
+    const whatsapp = p ? linkWhatsApp(p.phone, { pais: p.country }) : null;
 
     return (
         <Sheet open={!!p} onOpenChange={(open) => !open && fechar()}>
