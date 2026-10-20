@@ -2,7 +2,8 @@
 // Biblioteca de Anúncios (aba "Buscar lojas") ou cadastrados na mão.
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Info, Loader2, MapPin, Plus, Search, Star, Trash2, X } from "lucide-react";
+import { Info, Loader2, MapPin, Plus, Search, Send, Star, Trash2, X } from "lucide-react";
+import { useDashboard } from "@/contexts/DashboardContext";
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
     AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -19,7 +20,8 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
     SEGMENTOS_SUGERIDOS, SERVICOS, STATUS_PROSPECT, TIPO_SITE,
-    apagarBuscaGoogle, buscaGoogleSchema, criarProspect, enfileirarBuscaMaps, intocado, listarBuscasGoogle, listarProspects,
+    apagarBuscaGoogle, buscaGoogleSchema, criarProspect, disponivelProComercial, enfileirarBuscaMaps, intocado, levarProComercial,
+    listarBuscasGoogle, listarProspects,
     type BuscaGoogle, type RadarProspect, type Servico, type StatusProspect, type TipoSite,
 } from "./prospectApi";
 import { PotencialAnel, ServicosToggle } from "./RadarBits";
@@ -117,6 +119,24 @@ export function RadarProspectsPanel() {
             queryClient.invalidateQueries({ queryKey: ["radar_prospect_searches"] });
         },
         onError: (e: Error) => toast({ variant: "destructive", title: "Não deu pra buscar", description: e.message }),
+    });
+
+    // Leva os filtrados que ainda não foram (nem descartados) pra coluna Lead do Comercial.
+    const { workspaceId } = useDashboard();
+    const [confirmarLote, setConfirmarLote] = useState(false);
+    const paraLevar = useMemo(() => filtrados.filter(disponivelProComercial), [filtrados]);
+    const nichosParaLevar = useMemo(() => [...new Set(paraLevar.map((p) => p.segment))].join(", "), [paraLevar]);
+    const lote = useMutation({
+        mutationFn: () => {
+            if (!workspaceId) throw new Error("Workspace não identificado; abra o Comercial uma vez e tente de novo.");
+            return levarProComercial(paraLevar.map((p) => p.id), workspaceId);
+        },
+        onSuccess: (n) => {
+            toast({ title: `${n} no Comercial`, description: "Entraram na coluna Lead, com o nicho de cada um." });
+            setConfirmarLote(false);
+        },
+        onError: (e: Error) => toast({ variant: "destructive", title: "Não levou pro Comercial", description: e.message }),
+        onSettled: () => queryClient.invalidateQueries({ queryKey: ["radar_prospects"] }),
     });
 
     const [apagando, setApagando] = useState<BuscaGoogle | null>(null);
@@ -240,7 +260,12 @@ export function RadarProspectsPanel() {
                 <CardHeader className="space-y-3 pb-3">
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
                         <CardTitle className="text-base">Possíveis clientes</CardTitle>
-                        <span className="text-sm text-muted-foreground tabular-nums">{filtrados.length} de {prospects.data?.length ?? 0}</span>
+                        <div className="flex items-center gap-3">
+                            <span className="text-sm text-muted-foreground tabular-nums">{filtrados.length} de {prospects.data?.length ?? 0}</span>
+                            <Button size="sm" variant="outline" disabled={paraLevar.length === 0} onClick={() => setConfirmarLote(true)}>
+                                <Send className="mr-1.5 h-3.5 w-3.5" />Levar {paraLevar.length} pro Comercial
+                            </Button>
+                        </div>
                     </div>
                     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
                         <Input placeholder="nome, cidade…" value={texto} onChange={(e) => setTexto(e.target.value)} aria-label="Buscar na lista" className="2xl:col-span-1" />
@@ -327,6 +352,22 @@ export function RadarProspectsPanel() {
             </Card>
 
             <RadarProspectSheet prospect={aberto} onClose={() => setAbertoId(null)} />
+            <AlertDialog open={confirmarLote} onOpenChange={setConfirmarLote}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Levar {paraLevar.length} pro Comercial?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Entram na coluna Lead (fila de todos, sem responsável), com o nicho: {nichosParaLevar}. Quem já está no Comercial ou foi descartado fica de fora.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={(e) => { e.preventDefault(); lote.mutate(); }} disabled={lote.isPending}>
+                            {lote.isPending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}Levar
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
             <AlertDialog open={!!apagando} onOpenChange={(v) => !v && setApagando(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>

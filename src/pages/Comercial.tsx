@@ -3,9 +3,12 @@ import { useDashboard } from "@/contexts/DashboardContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAgencyTeam } from "@/hooks/useAgencyTeam";
-import { Plus, Trash2, AlertTriangle, Trophy, TrendingUp, Settings, Phone, Check, PhoneCall, Columns3 } from "lucide-react";
+import { Plus, Trash2, AlertTriangle, Trophy, TrendingUp, Settings, Phone, Check, PhoneCall, Columns3, Radar } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CallMode, PlacarDoDia } from "@/components/crm/CallMode";
+import { ImportarDoRadar } from "@/components/crm/ImportarDoRadar";
+import { SEGMENTOS_SUGERIDOS, listarProspects } from "@/components/radar/prospectApi";
+import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import {
     Popover,
@@ -111,14 +114,29 @@ export default function Comercial() {
         try { localStorage.setItem("crm_visao", v); } catch { /* preferência só deste navegador */ }
     };
 
-    const nichos = useMemo(() => [...new Set(leads.map((l) => l.segment).filter((s): s is string => !!s))].sort(), [leads]);
-    // Nicho e responsável valem pras duas visões (ligar e kanban): camisa não mistura com o resto.
+    const [importarAberto, setImportarAberto] = useState(false);
+    // Nichos = os do Radar (buscas sugeridas + possíveis clientes) + os que já estão nos leads.
+    // Quem não tem acesso ao Radar recebe a lista de possíveis clientes vazia (RLS).
+    const radar = useQuery({ queryKey: ["radar_prospects"], queryFn: listarProspects });
+    const nichos = useMemo(() => [...new Set([
+        ...Object.keys(SEGMENTOS_SUGERIDOS),
+        ...(radar.data ?? []).map((p) => p.segment),
+        ...leads.map((l) => l.segment).filter((s): s is string => !!s),
+    ])].sort(), [leads, radar.data]);
+    const leadsPorNicho = useMemo(() => {
+        const m = new Map<string, number>();
+        for (const l of leads) if (l.segment) m.set(l.segment, (m.get(l.segment) ?? 0) + 1);
+        return m;
+    }, [leads]);
+    // Nicho vale pra tudo. Responsável não mexe na coluna Lead (1ª coluna): ela é a fila de todos.
+    const colunaLead = columns[0]?.id;
     const leadsFiltrados = useMemo(() => leads.filter((l) => {
         if (fNicho === SEM ? !!l.segment : fNicho !== TODOS && l.segment !== fNicho) return false;
+        if (!l.column_id || l.column_id === colunaLead) return true;
         if (fDono === MEUS) return l.owner_id === user?.id;
         if (fDono === SEM) return !l.owner_id;
         return fDono === TODOS || l.owner_id === fDono;
-    }), [leads, fNicho, fDono, user?.id]);
+    }), [leads, fNicho, fDono, user?.id, colunaLead]);
 
     const handleSavePhone = () => {
         localStorage.setItem('lever_comercial_phone', comercialPhone);
@@ -358,7 +376,7 @@ export default function Comercial() {
                         <SelectTrigger className="h-10 w-[180px]" aria-label="Nicho"><SelectValue /></SelectTrigger>
                         <SelectContent>
                             <SelectItem value={TODOS}>Todos os nichos</SelectItem>
-                            {nichos.map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}
+                            {nichos.map((n) => <SelectItem key={n} value={n}>{n} ({leadsPorNicho.get(n) ?? 0})</SelectItem>)}
                             <SelectItem value={SEM}>Sem nicho</SelectItem>
                         </SelectContent>
                     </Select>
@@ -372,6 +390,11 @@ export default function Comercial() {
                         </SelectContent>
                     </Select>
                     <span className="text-sm tabular-nums text-muted-foreground">{leadsFiltrados.length} de {leads.length} leads</span>
+                    {canEdit('crm') && (
+                        <Button variant="outline" className="h-10 rounded-xl" onClick={() => setImportarAberto(true)}>
+                            <Radar className="mr-2 h-4 w-4" />Importar do Radar
+                        </Button>
+                    )}
                 </div>
                 {workspaceId && <PlacarDoDia workspaceId={workspaceId} membros={members} />}
             </div>
@@ -439,6 +462,13 @@ export default function Comercial() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            <ImportarDoRadar
+                open={importarAberto}
+                onOpenChange={setImportarAberto}
+                workspaceId={workspaceId}
+                onImportado={() => fetchData(false)}
+            />
 
             <ClientRankingModal
                 isOpen={isRankingOpen}

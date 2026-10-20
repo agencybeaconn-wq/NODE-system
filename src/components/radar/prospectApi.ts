@@ -276,47 +276,19 @@ export async function prospectDeCandidata(c: RadarCandidate) {
     if (error) throw duplicado(error, c.domain) ?? erro("virar possível cliente", error);
 }
 
-// Cria o lead no kanban do Comercial (primeira coluna do workspace) e marca o prospect.
-export async function levarProComercial(p: RadarProspect, workspaceId: string) {
-    const { data: colunas, error: erroCol } = await db
-        .from("crm_kanban_columns")
-        .select("id, title")
-        .eq("workspace_id", workspaceId)
-        .order("order_index", { ascending: true })
-        .limit(1);
-    if (erroCol) throw erro("ler colunas do Comercial", erroCol);
-    const coluna = colunas?.[0];
-    const servicos = p.services.map((s) => SERVICOS[s]).join(", ");
-    const linhas = [
-        `Veio do Radar de clientes (${p.segment}${p.city ? `, ${p.city}` : ""}).`,
-        `Presença: ${TIPO_SITE[p.site_kind]}${p.website ? ` (${p.website})` : ""}.`,
-        p.reviews != null ? `Google: ${p.rating ?? "–"} estrelas, ${p.reviews} avaliações.` : null,
-        p.instagram ? `Instagram: ${p.instagram}` : null,
-        p.maps_url ? `Maps: ${p.maps_url}` : null,
-        p.notes ? `\n${p.notes}` : null,
-    ].filter(Boolean);
-    const { data: auth } = await supabase.auth.getUser();
-    // O kanban entende Quente/Morno/Frio; mesmas faixas do anel do Radar (prospectUtils).
-    const temperatura = p.score == null ? null : p.score >= 70 ? "Quente" : p.score >= 45 ? "Morno" : "Frio";
-    const { data: lead, error } = await supabase
-        .from("crm_leads")
-        .insert({
-            workspace_id: workspaceId,
-            name: p.name.slice(0, 200),
-            store_name: p.name.slice(0, 200),
-            phone: p.phone,
-            site_url: p.website,
-            product_interest: servicos || null,
-            lead_score: temperatura,
-            segment: p.segment,
-            owner_id: auth.user?.id ?? null,
-            observations: linhas.join("\n"),
-            utm_source: "radar-clientes",
-            ...(coluna ? { column_id: coluna.id, lead_status: coluna.title.toLowerCase().replace(/\s+/g, "_") } : {}),
-        } as any)
-        .select("id")
-        .single();
-    if (error) throw erro("criar lead no Comercial", error);
-    const { error: erroMarca } = await db.from("radar_prospects").update({ status: "no_comercial", crm_lead_id: lead.id }).eq("id", p.id);
-    if (erroMarca) throw erro("marcar possível cliente", erroMarca);
+// Pode ir pro Comercial: ainda não foi e não foi descartado.
+export const disponivelProComercial = (p: RadarProspect) => !p.crm_lead_id && p.status !== "descartado";
+
+// Leva pro Comercial na coluna "Lead" (fila comum, sem responsável), com o nicho.
+// Tudo numa transação no banco (radar_levar_pro_comercial); quem já foi é ignorado.
+// Devolve quantos entraram.
+export async function levarProComercial(ids: string[], workspaceId: string): Promise<number> {
+    if (!ids.length) return 0;
+    let total = 0;
+    for (let de = 0; de < ids.length; de += 500) {
+        const { data, error } = await db.rpc("radar_levar_pro_comercial", { p_ids: ids.slice(de, de + 500), p_workspace: workspaceId });
+        if (error) throw erro("levar pro Comercial", error);
+        total += data ?? 0;
+    }
+    return total;
 }

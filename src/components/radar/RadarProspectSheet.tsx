@@ -68,10 +68,10 @@ export function RadarProspectSheet({ prospect: p, onClose }: RadarProspectSheetP
     const comercial = useMutation({
         mutationFn: () => {
             if (!workspaceId) throw new Error("Workspace não identificado; abra o Comercial uma vez e tente de novo.");
-            return levarProComercial(p!, workspaceId);
+            return levarProComercial([p!.id], workspaceId);
         },
         onSuccess: () => {
-            toast({ title: "No Comercial", description: `${p!.name} entrou na primeira coluna do kanban.` });
+            toast({ title: "No Comercial", description: `${p!.name} entrou na coluna Lead, nicho ${p!.segment}.` });
             recarregar();
         },
         onError: (e: Error) => toast({ variant: "destructive", title: "Não levou pro Comercial", description: e.message }),
