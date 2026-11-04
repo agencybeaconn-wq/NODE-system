@@ -21,6 +21,14 @@
             "destination": "/mentoria-de-ia/index.html"
         },
         {
+            "source": "/oferta",
+            "destination": "/oferta/index.html"
+        },
+        {
+            "source": "/oferta/",
+            "destination": "/oferta/index.html"
+        },
+        {
             "source": "/(.*)",
             "destination": "/index.html"
         }
