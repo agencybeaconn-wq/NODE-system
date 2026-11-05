@@ -64,7 +64,7 @@ s { text-decoration-thickness: 1.5px; }
 .micro { color: var(--texto-apagado); font-size: var(--t-p); }
 
 /* Marcador de revisão: some antes de publicar (procurar "pendente"). */
-.pendente { outline: 1px dashed #E0B341; outline-offset: 2px; background: rgba(224, 179, 65, .12); border-radius: 4px; color: inherit; padding: 0 4px; }
+.pendente { outline: 1px dashed #E0B341; outline-offset: 2px; background: rgba(224, 179, 65, .12); border-radius: 4px; color: inherit; }
 
 /* Botão: o mesmo CTA em toda a página */
 .botao {
@@ -231,18 +231,21 @@ s { text-decoration-thickness: 1.5px; }
 .linha-motion li::before { content: counter(etapa, decimal-leading-zero); grid-row: span 2; padding-top: 3px; color: var(--acento); font-size: .8125rem; font-weight: 700; letter-spacing: .06em; }
 .linha-motion h3 { font-size: 1.0625rem; }
 .linha-motion p { color: var(--texto-apagado); font-size: .9375rem; }
-.tabela { background: var(--bg-elev); border: 1px solid var(--borda-forte); border-radius: var(--raio); padding: 22px; }
+/* Tabela de pacotes: mesmo cartão das outras ofertas; coluna da quantidade com largura fixa pra o "de" alinhar entre as linhas */
+.tabela { position: relative; background: var(--bg-elev); border: 1px solid var(--borda-forte); border-radius: var(--raio); padding: 22px; }
 @media (min-width: 820px) { .tabela { padding: 30px; } }
-.tabela-cabeca { display: flex; justify-content: space-between; gap: 12px; font-size: .75rem; letter-spacing: .14em; text-transform: uppercase; color: var(--texto-apagado); padding-bottom: 14px; border-bottom: 1px solid var(--borda); }
-.tabela-cabeca span:last-child { color: var(--acento); }
-.tabela-linha { display: grid; grid-template-columns: auto 1fr auto; align-items: baseline; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--borda); }
-.tabela-linha .qtd { font-size: 2.25rem; font-weight: 400; line-height: 1; letter-spacing: -.03em; }
+.tabela h3 { font-size: var(--t-h3); padding-bottom: 14px; border-bottom: 1px solid var(--borda); }
+.tabela-linha { display: grid; grid-template-columns: 4.5rem 1fr auto; align-items: baseline; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--borda); }
+.tabela-linha .qtd { font-size: 1.875rem; font-weight: 400; line-height: 1; letter-spacing: -.03em; white-space: nowrap; }
 .tabela-linha .qtd small { font-size: .6875rem; letter-spacing: .14em; text-transform: uppercase; color: var(--texto-apagado); margin-left: 6px; }
-.tabela-linha .de { color: var(--texto-apagado); font-size: .875rem; }
-.tabela-linha .por { font-size: 1.75rem; font-weight: 500; letter-spacing: -.02em; }
-.inclui { list-style: none; margin: 20px 0 24px; padding: 0; display: grid; gap: 10px; }
-@media (min-width: 560px) { .inclui { grid-template-columns: 1fr 1fr; } }
-.inclui li::before { content: "+"; color: var(--acento); font-weight: 700; margin-right: 10px; }
+.tabela-linha .de { color: var(--texto-apagado); font-size: .8125rem; }
+.tabela-linha .por { font-size: 1.5rem; font-weight: 500; letter-spacing: -.02em; white-space: nowrap; }
+@media (min-width: 560px) {
+  .tabela-linha { grid-template-columns: 6rem 1fr auto; }
+  .tabela-linha .qtd { font-size: 2.25rem; }
+  .tabela-linha .por { font-size: 1.75rem; }
+}
+.tabela .lista { margin: 20px 0 24px; }
 
 /* Passos */
 .passos { display: grid; gap: 14px; counter-reset: passo; list-style: none; margin: 0; padding: 0; }
