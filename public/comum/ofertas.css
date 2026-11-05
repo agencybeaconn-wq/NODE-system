@@ -244,6 +244,8 @@ s { text-decoration-thickness: 1.5px; }
   .tabela-linha .por { font-size: 1.75rem; }
 }
 .tabela .lista { margin: 20px 0 24px; }
+.desafio { margin: 4px 0 12px; min-height: 0; }
+.desafio:empty { display: none; }
 
 /* Passos */
 .passos { display: grid; gap: 14px; counter-reset: passo; list-style: none; margin: 0; padding: 0; }

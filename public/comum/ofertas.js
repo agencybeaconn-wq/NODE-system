@@ -26,12 +26,13 @@
 
   // Cada serviço que a pessoa realmente vê vira um ViewContent (uma vez por serviço), pra o Meta saber o que interessou.
   if ('IntersectionObserver' in window) {
+    // Observa o cabeçalho da seção, não a seção: ela é mais alta que a tela do celular e nunca chegaria a 50% visível.
     const vistos = new IntersectionObserver((entradas) => entradas.forEach((e) => {
       if (!e.isIntersecting) return;
       vistos.unobserve(e.target);
-      rastrear('ViewContent', { content_name: e.target.id, content_type: 'servico' });
-    }), { threshold: .5 });
-    document.querySelectorAll('#lojas, #sites, #paginas, #motion').forEach((s) => vistos.observe(s));
+      rastrear('ViewContent', { content_name: e.target.closest('section').id, content_type: 'servico' });
+    }), { threshold: .6 });
+    document.querySelectorAll('#lojas .cabeca, #sites .cabeca, #paginas .cabeca, #motion .cabeca').forEach((c) => vistos.observe(c));
   }
 
   // Só um motion toca por vez: dar play num pausa os outros.
@@ -102,9 +103,11 @@
   };
 
   const digitos = (v) => v.replace(/\D/g, '');
+  // Quem cola "+55 31 9...": o 55 sai antes de cortar em 11 dígitos, senão vira DDD e perde o último número.
+  const telefoneNacional = (v) => { let d = digitos(v); if (d.length >= 12 && d.startsWith('55')) d = d.slice(2); return d.slice(0, 11); };
   const telefone = form.querySelector('input[name=whatsapp]');
   telefone.addEventListener('input', () => {
-    const d = digitos(telefone.value).slice(0, 11);
+    const d = telefoneNacional(telefone.value);
     let v = d;
     if (d.length > 2) v = `(${d.slice(0, 2)}) ${d.slice(2)}`;
     if (d.length > 7) v = `(${d.slice(0, 2)}) ${d.slice(2, d.length - 4)}-${d.slice(-4)}`;
@@ -160,6 +163,23 @@
     const de = atual;
     window.setTimeout(() => { if (atual === de) mostrar(de + 1); }, reduzido ? 0 : 220);
   });
+
+  // Desafio anti-robô (Cloudflare Turnstile, modo invisível): só existe quando data-turnstile no <html> tem a chave do site.
+  // O servidor exige o token quando o segredo dele está configurado; os dois ligam juntos.
+  const desafio = (() => {
+    const chave = document.documentElement.dataset.turnstile;
+    if (!chave) return { ativo: false, token: () => '' };
+    const caixa = document.createElement('div');
+    caixa.className = 'desafio';
+    passos[passos.length - 1].querySelector('.consentimento').before(caixa);
+    let id = null;
+    const script = document.createElement('script');
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+    script.async = true;
+    script.onload = () => { id = window.turnstile.render(caixa, { sitekey: chave, size: 'flexible', appearance: 'interaction-only', language: 'pt-br' }); };
+    document.head.append(script);
+    return { ativo: true, token: () => (window.turnstile && id !== null ? window.turnstile.getResponse(id) : '') };
+  })();
 
   const escolhido = (nome) => [...form.querySelectorAll(`input[name="${nome}"]:checked`)]
     .map((campo) => campo.nextElementSibling.textContent.trim()).join(', ');
@@ -232,7 +252,7 @@
       faturamento: valores('faturamento')[0],
       decisor: valores('decisor')[0],
       nome,
-      whatsapp: digitos(String(fd.get('whatsapp') || '')),
+      whatsapp: telefoneNacional(String(fd.get('whatsapp') || '')),
       oferta: pagina.dataset.oferta,
       pagina: url.origin + url.pathname,
       event_id: (crypto.randomUUID && crypto.randomUUID()) || String(Date.now()),
@@ -246,6 +266,10 @@
     if (fbp) dados.fbp = fbp;
     if (fbc) dados.fbc = fbc;
     if (document.referrer) dados.referrer = document.referrer.slice(0, 300);
+    if (desafio.ativo) {
+      dados.turnstile = desafio.token();
+      if (!dados.turnstile) { passos[atual].querySelector('.erro').textContent = 'Espera um segundo e tenta de novo: a verificação ainda não terminou.'; return; }
+    }
     // Versão legível, só pra tela de obrigado e pro WhatsApp.
     const legivel = { nome, area: escolhido('area'), produtos: escolhido('produtos'), dificuldade: escolhido('dificuldade'), faturamento: escolhido('faturamento'), decisor: escolhido('decisor') };
 
