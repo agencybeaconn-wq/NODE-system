@@ -63,8 +63,6 @@ s { text-decoration-thickness: 1.5px; }
 .cabeca-centro .apoio { margin: 0 auto; }
 .micro { color: var(--texto-apagado); font-size: var(--t-p); }
 
-/* Marcador de revisão: some antes de publicar (procurar "pendente"). */
-.pendente { outline: 1px dashed #E0B341; outline-offset: 2px; background: rgba(224, 179, 65, .12); border-radius: 4px; color: inherit; }
 
 /* Botão: o mesmo CTA em toda a página */
 .botao {
@@ -258,12 +256,12 @@ s { text-decoration-thickness: 1.5px; }
 
 /* Quem faz */
 .quem { display: grid; gap: 32px; align-items: center; }
-@media (min-width: 820px) { .quem { grid-template-columns: 7fr 5fr; } }
+@media (min-width: 820px) { .quem:has(.video-vaga) { grid-template-columns: 7fr 5fr; } }
 .quem-texto { display: grid; gap: 16px; justify-items: start; }
 .video-vaga { width: min(280px, 72vw); aspect-ratio: 9 / 16; justify-self: center; display: grid; place-items: center; text-align: center; padding: 24px; border-radius: var(--raio); background: var(--bg-elev); }
 
 /* Perguntas */
-.perguntas { display: grid; gap: 10px; max-width: 780px; }
+.perguntas { display: grid; gap: 10px; max-width: 780px; margin: 0 auto; }
 .perguntas details { background: var(--bg-elev); border: 1px solid var(--borda); border-radius: var(--raio-p); transition: border-color var(--micro) var(--curva); }
 .perguntas details:hover, .perguntas details[open] { border-color: var(--borda-forte); }
 .perguntas summary { list-style: none; cursor: pointer; padding: 18px 20px; font-weight: 500; display: flex; justify-content: space-between; gap: 16px; align-items: center; }
@@ -362,8 +360,19 @@ s { text-decoration-thickness: 1.5px; }
 
 /* Trabalhos: colunas por grupo no PC */
 @media (min-width: 1100px) {
-  .trilho-celulares.cols-5 { grid-template-columns: repeat(5, 1fr); }
-  .trilho-celulares.cols-4 { grid-template-columns: repeat(4, 1fr); max-width: 940px; }
+  .trilho-celulares { grid-template-columns: repeat(4, 1fr); max-width: 940px; }
+  .trilho-videos { grid-template-columns: repeat(5, 1fr); max-width: none; }
 }
 @media (min-width: 820px) { .trilho-tablets { grid-template-columns: repeat(2, 1fr); } }
 @media (min-width: 1100px) { .trilho-tablets { grid-template-columns: repeat(4, 1fr); } }
+
+/* Trabalhos rolando dentro da moldura: do topo ao fim da página e de volta. A moldura vira contêiner pra o curso ser calculado em CSS. */
+.tela-tablet:has(> .rolavel), .tela-celular:has(> .rolavel) { container-type: size; }
+.tela-tablet .rolavel, .tela-celular .rolavel { height: auto; min-height: 100%; animation: rolar-trabalho var(--dur, 16s) linear infinite alternate; animation-play-state: paused; }
+.rolavel.rolando { animation-play-state: running; }
+.peca:hover .rolavel { animation-play-state: paused; }
+@keyframes rolar-trabalho {
+  0%, 6% { transform: translateY(0); }
+  94%, 100% { transform: translateY(min(0px, calc(100cqh - 100%))); }
+}
+@media (prefers-reduced-motion: reduce) { .rolavel { animation: none; } }

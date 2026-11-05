@@ -24,6 +24,24 @@
     if (typeof window.fbq === 'function') window.fbq('track', evento, dados || {}, id ? { eventID: id } : undefined);
   };
 
+  // Só um motion toca por vez: dar play num pausa os outros.
+  const motions = [...document.querySelectorAll('video[controls]')];
+  motions.forEach((v) => v.addEventListener('play', () => motions.forEach((outro) => { if (outro !== v) outro.pause(); })));
+
+  // Trabalhos rolando dentro da moldura: a duração vem do tamanho da página, e só anda enquanto está na tela.
+  const rolaveis = [...document.querySelectorAll('.rolavel')];
+  const ajustarDuracao = (img) => {
+    const moldura = img.parentElement;
+    const curso = (img.naturalHeight / img.naturalWidth) * moldura.clientWidth - moldura.clientHeight;
+    img.style.setProperty('--dur', `${Math.min(36, Math.max(8, curso / 60))}s`);
+  };
+  rolaveis.forEach((img) => { if (img.complete && img.naturalWidth) ajustarDuracao(img); else img.addEventListener('load', () => ajustarDuracao(img), { once: true }); });
+  if (rolaveis.length && !reduzido && 'IntersectionObserver' in window) {
+    // Observa a moldura, não a imagem: a imagem é muito mais alta que a janela dela e nunca chegaria a 20% visível.
+    const olhar = new IntersectionObserver((entradas) => entradas.forEach((e) => e.target.querySelector('.rolavel').classList.toggle('rolando', e.isIntersecting)), { threshold: .2 });
+    rolaveis.forEach((img) => olhar.observe(img.parentElement));
+  }
+
   // Revelar ao rolar
   const revelaveis = document.querySelectorAll('.revela');
   if ('IntersectionObserver' in window) {

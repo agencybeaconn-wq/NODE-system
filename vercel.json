@@ -29,6 +29,14 @@
             "destination": "/oferta/index.html"
         },
         {
+            "source": "/privacidade",
+            "destination": "/privacidade/index.html"
+        },
+        {
+            "source": "/privacidade/",
+            "destination": "/privacidade/index.html"
+        },
+        {
             "source": "/(.*)",
             "destination": "/index.html"
         }
