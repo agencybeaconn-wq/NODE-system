@@ -192,6 +192,8 @@ s { text-decoration-thickness: 1.5px; }
 .preco .de { color: var(--texto-apagado); font-size: .8125rem; }
 .preco .por { font-size: 1.75rem; font-weight: 500; letter-spacing: -.02em; line-height: 1.1; }
 .preco .por small { font-size: .8125rem; color: var(--texto-apagado); font-weight: 400; letter-spacing: 0; margin-right: 4px; }
+/* Centavos menores e no alto, como no preço de vitrine */
+.cent { font-size: .58em; letter-spacing: 0; vertical-align: .62em; line-height: 0; margin-left: 1px; }
 .desconto { position: absolute; top: -11px; right: 18px; background: var(--acento-fundo); color: var(--texto); font-size: .75rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; }
 .complemento { margin-top: 20px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; padding: 18px 22px; border: 1px dashed var(--borda-forte); border-radius: var(--raio); }
 .complemento p { color: var(--texto-apagado); }
