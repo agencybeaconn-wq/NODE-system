@@ -366,6 +366,9 @@ s { text-decoration-thickness: 1.5px; }
 @media (min-width: 820px) { .trilho-tablets { grid-template-columns: repeat(2, 1fr); } }
 @media (min-width: 1100px) { .trilho-tablets { grid-template-columns: repeat(4, 1fr); } }
 
+/* Nas vitrines, o tablet fica em pé (mais alto que largo) pra mostrar mais da loja; o do topo segue deitado. */
+.trilho-tablets .tela-tablet { aspect-ratio: 4 / 5; }
+
 /* Trabalhos rolando dentro da moldura: do topo ao fim da página e de volta. A moldura vira contêiner pra o curso ser calculado em CSS. */
 .tela-tablet:has(> .rolavel), .tela-celular:has(> .rolavel) { container-type: size; }
 .tela-tablet .rolavel, .tela-celular .rolavel { height: auto; min-height: 100%; animation: rolar-trabalho var(--dur, 16s) linear infinite alternate; animation-play-state: paused; }

@@ -330,7 +330,23 @@
               <label>Não preencha este campo <input type="text" name="site_empresa" tabindex="-1" autocomplete="off"></label>
             </div>
 
-            <fieldset class="passo">
+            <fieldset class="passo" aria-describedby="erro-area">
+              <legend>Em que área você atua?</legend>
+              <div class="opcoes">
+                <label class="opcao"><input type="radio" name="area" value="loja-virtual" required><span>Loja virtual</span></label>
+                <label class="opcao"><input type="radio" name="area" value="loja-fisica"><span>Loja física ou atacado</span></label>
+                <label class="opcao"><input type="radio" name="area" value="servico"><span>Clínica, escritório ou estúdio</span></label>
+                <label class="opcao"><input type="radio" name="area" value="autonomo"><span>Profissional autônomo ou criador de conteúdo</span></label>
+                <label class="opcao"><input type="radio" name="area" value="outra"><span>Outra área</span></label>
+              </div>
+              <p class="erro" id="erro-area" aria-live="polite"></p>
+              <div class="acoes">
+                <button class="voltar" type="button" data-acao="voltar">Voltar</button>
+                <button class="botao" type="button" data-acao="avancar">Continuar</button>
+              </div>
+            </fieldset>
+
+            <fieldset class="passo" aria-describedby="erro-produtos">
               <legend>O que você quer pra Black Friday?</legend>
               <p class="dica">Pode marcar mais de um.</p>
               <div class="opcoes" data-grupo>
@@ -340,85 +356,73 @@
                 <label class="opcao"><input type="checkbox" name="produtos" value="motion"><span>Vídeos em motion</span></label>
                 <label class="opcao"><input type="checkbox" name="produtos" value="edicao"><span>Edição de página ou loja</span></label>
               </div>
-              <p class="erro" aria-live="polite"></p>
+              <p class="erro" id="erro-produtos" aria-live="polite"></p>
               <div class="acoes">
                 <button class="voltar" type="button" data-acao="voltar">Voltar</button>
                 <button class="botao" type="button" data-acao="avancar">Continuar</button>
               </div>
             </fieldset>
 
-            <fieldset class="passo">
-              <legend>Pra quem a gente liga?</legend>
-              <div class="campo">
-                <label for="nome">Seu nome</label>
-                <input id="nome" name="nome" type="text" autocomplete="name" required data-erro="Escreve seu nome pra continuar." placeholder="Como você se chama">
-              </div>
-              <div class="campo">
-                <label for="whatsapp">WhatsApp com DDD</label>
-                <input id="whatsapp" name="whatsapp" type="tel" inputmode="numeric" autocomplete="tel-national" required placeholder="(11) 99999-8888">
-              </div>
-              <p class="erro" aria-live="polite"></p>
-              <div class="acoes">
-                <button class="voltar" type="button" data-acao="voltar">Voltar</button>
-                <button class="botao" type="button" data-acao="avancar">Continuar</button>
-              </div>
-            </fieldset>
-
-            <fieldset class="passo">
-              <legend>Qual é a sua empresa?</legend>
-              <p class="dica">Pra gente olhar antes de te chamar.</p>
-              <div class="campo">
-                <label for="empresa">Site ou Instagram</label>
-                <input id="empresa" name="empresa" type="text" autocomplete="url" autocapitalize="none" required data-erro="Coloca o site ou o @ do Instagram." placeholder="@suaempresa ou suaempresa.com.br">
-              </div>
-              <p class="erro" aria-live="polite"></p>
-              <div class="acoes">
-                <button class="voltar" type="button" data-acao="voltar">Voltar</button>
-                <button class="botao" type="button" data-acao="avancar">Continuar</button>
-              </div>
-            </fieldset>
-
-            <fieldset class="passo">
-              <legend>Onde você vende hoje?</legend>
+            <fieldset class="passo" aria-describedby="erro-dificuldade">
+              <legend>Qual a maior dificuldade que você enfrenta hoje?</legend>
               <div class="opcoes">
-                <label class="opcao"><input type="radio" name="canal" value="shopify" required><span>Loja na Shopify</span></label>
-                <label class="opcao"><input type="radio" name="canal" value="outra-plataforma"><span>Loja em outra plataforma</span></label>
-                <label class="opcao"><input type="radio" name="canal" value="instagram-whatsapp"><span>Instagram e WhatsApp</span></label>
-                <label class="opcao"><input type="radio" name="canal" value="marketplace"><span>Marketplace, como Mercado Livre e Shopee</span></label>
-                <label class="opcao"><input type="radio" name="canal" value="nao-vende-online"><span>Ainda não vendo online</span></label>
+                <label class="opcao"><input type="radio" name="dificuldade" value="pagina-nao-vende" required><span>Meu anúncio leva pra uma página que não vende</span></label>
+                <label class="opcao"><input type="radio" name="dificuldade" value="sem-confianca"><span>Minha loja ou site não passa confiança</span></label>
+                <label class="opcao"><input type="radio" name="dificuldade" value="so-indicacao"><span>Dependo só de indicação e do Instagram</span></label>
+                <label class="opcao"><input type="radio" name="dificuldade" value="video-nao-chama"><span>Meus vídeos e anúncios não chamam atenção</span></label>
+                <label class="opcao"><input type="radio" name="dificuldade" value="outra"><span>Outra dificuldade</span></label>
               </div>
-              <p class="erro" aria-live="polite"></p>
+              <p class="erro" id="erro-dificuldade" aria-live="polite"></p>
               <div class="acoes">
                 <button class="voltar" type="button" data-acao="voltar">Voltar</button>
                 <button class="botao" type="button" data-acao="avancar">Continuar</button>
               </div>
             </fieldset>
 
-            <fieldset class="passo">
-              <legend>Quanto sua empresa fatura por mês?</legend>
+            <fieldset class="passo" aria-describedby="erro-faturamento">
+              <legend>Qual o faturamento mensal da sua empresa?</legend>
               <p class="dica">Só pra gente chegar na conversa com a proposta certa.</p>
               <div class="opcoes">
                 <label class="opcao"><input type="radio" name="faturamento" value="0" required><span>Ainda não faturo</span></label>
                 <label class="opcao"><input type="radio" name="faturamento" value="ate-10k"><span>Até R$ 10 mil</span></label>
-                <label class="opcao"><input type="radio" name="faturamento" value="10k-50k"><span>De R$ 10 mil a R$ 50 mil</span></label>
-                <label class="opcao"><input type="radio" name="faturamento" value="50k-200k"><span>De R$ 50 mil a R$ 200 mil</span></label>
-                <label class="opcao"><input type="radio" name="faturamento" value="200k-mais"><span>Acima de R$ 200 mil</span></label>
+                <label class="opcao"><input type="radio" name="faturamento" value="10k-30k"><span>De R$ 10 mil a R$ 30 mil</span></label>
+                <label class="opcao"><input type="radio" name="faturamento" value="30k-60k"><span>De R$ 30 mil a R$ 60 mil</span></label>
+                <label class="opcao"><input type="radio" name="faturamento" value="60k-100k"><span>De R$ 60 mil a R$ 100 mil</span></label>
+                <label class="opcao"><input type="radio" name="faturamento" value="100k-mais"><span>Acima de R$ 100 mil</span></label>
               </div>
-              <p class="erro" aria-live="polite"></p>
+              <p class="erro" id="erro-faturamento" aria-live="polite"></p>
               <div class="acoes">
                 <button class="voltar" type="button" data-acao="voltar">Voltar</button>
                 <button class="botao" type="button" data-acao="avancar">Continuar</button>
               </div>
             </fieldset>
 
-            <fieldset class="passo">
-              <legend>Quando você quer começar?</legend>
+            <fieldset class="passo" aria-describedby="erro-decisor">
+              <legend>Quem toma as decisões junto com você na empresa?</legend>
               <div class="opcoes">
-                <label class="opcao"><input type="radio" name="quando" value="black-friday" required><span>A tempo da Black Friday</span></label>
-                <label class="opcao"><input type="radio" name="quando" value="depois-bf"><span>Depois da Black Friday</span></label>
-                <label class="opcao"><input type="radio" name="quando" value="pesquisando"><span>Ainda estou pesquisando</span></label>
+                <label class="opcao"><input type="radio" name="decisor" value="sozinho" required><span>Decido tudo sozinho</span></label>
+                <label class="opcao"><input type="radio" name="decisor" value="socio"><span>Decido com meu sócio</span></label>
+                <label class="opcao"><input type="radio" name="decisor" value="familia"><span>Decido com meu cônjuge ou família</span></label>
+                <label class="opcao"><input type="radio" name="decisor" value="nao-decido"><span>Não sou quem decide</span></label>
               </div>
-              <p class="erro" aria-live="polite"></p>
+              <p class="erro" id="erro-decisor" aria-live="polite"></p>
+              <div class="acoes">
+                <button class="voltar" type="button" data-acao="voltar">Voltar</button>
+                <button class="botao" type="button" data-acao="avancar">Continuar</button>
+              </div>
+            </fieldset>
+
+            <fieldset class="passo" aria-describedby="erro-contato">
+              <legend>Pra quem a gente chama no WhatsApp?</legend>
+              <div class="campo">
+                <label for="nome">Seu nome</label>
+                <input id="nome" aria-describedby="erro-contato" name="nome" type="text" autocomplete="name" required data-erro="Escreve seu nome pra continuar." placeholder="Como você se chama">
+              </div>
+              <div class="campo">
+                <label for="whatsapp">WhatsApp com DDD</label>
+                <input id="whatsapp" aria-describedby="erro-contato" name="whatsapp" type="tel" inputmode="numeric" autocomplete="tel-national" required placeholder="(11) 99999-8888">
+              </div>
+              <p class="erro" id="erro-contato" aria-live="polite"></p>
               <p class="consentimento">Ao enviar, você concorda com a <a href="../privacidade/">Política de Privacidade</a>. A gente usa seus dados só pra falar com você sobre este pedido.</p>
               <div class="acoes">
                 <button class="voltar" type="button" data-acao="voltar">Voltar</button>

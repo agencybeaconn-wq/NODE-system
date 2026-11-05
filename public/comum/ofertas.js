@@ -79,6 +79,7 @@
   let atual = 0;
 
   const mostrar = (indice, focar = true) => {
+    indice = Math.min(indice, passos.length - 1);
     atual = indice;
     passos.forEach((p, i) => p.classList.toggle('ativo', i === indice));
     textoProgresso.textContent = `Passo ${indice + 1} de ${passos.length}`;
@@ -103,6 +104,7 @@
   const validar = (passo) => {
     const erro = passo.querySelector('.erro');
     let mensagem = '';
+    passo.querySelectorAll('input[aria-invalid]').forEach((c) => c.removeAttribute('aria-invalid'));
     const grupo = passo.querySelector('[data-grupo]');
     if (grupo && !grupo.querySelector('input:checked')) mensagem = 'Marca pelo menos uma opção pra continuar.';
     for (const campo of passo.querySelectorAll('input[required]')) {
@@ -113,9 +115,9 @@
       const valor = campo.value.trim();
       if (campo.name === 'whatsapp') {
         const n = digitos(valor).length;
-        if (n < 10 || n > 11) { mensagem = 'Confere o WhatsApp com DDD. Ex.: (11) 99999-8888.'; campo.focus(); break; }
+        if (n < 10 || n > 11) { mensagem = 'Confere o WhatsApp com DDD. Ex.: (11) 99999-8888.'; campo.setAttribute('aria-invalid', 'true'); campo.focus(); break; }
       } else if (valor.length < 2) {
-        mensagem = campo.dataset.erro || 'Preenche esse campo pra continuar.'; campo.focus(); break;
+        mensagem = campo.dataset.erro || 'Preenche esse campo pra continuar.'; campo.setAttribute('aria-invalid', 'true'); campo.focus(); break;
       }
     }
     erro.textContent = mensagem;
@@ -144,7 +146,9 @@
     if (e.target.type !== 'radio' || atual === passos.length - 1 || !porToque) return;
     porToque = false;
     passos[atual].querySelector('.erro').textContent = '';
-    window.setTimeout(() => mostrar(atual + 1), reduzido ? 0 : 220);
+    // Só avança se a pessoa ainda estiver neste passo quando o timer disparar (toque + Continuar rápido avançava duas vezes).
+    const de = atual;
+    window.setTimeout(() => { if (atual === de) mostrar(de + 1); }, reduzido ? 0 : 220);
   });
 
   const escolhido = (nome) => [...form.querySelectorAll(`input[name="${nome}"]:checked`)]
@@ -169,19 +173,19 @@
   const montarResumo = (dados) => [
     `Oi! Vim pela página "${pagina.dataset.ofertaNome}" da NODE e preenchi o formulário.`,
     '',
-    `Quero: ${dados.produtos}`,
     `Nome: ${dados.nome}`,
-    `Empresa: ${dados.empresa}`,
-    `Vendo em: ${dados.canal}`,
+    `Área: ${dados.area}`,
+    `Quero: ${dados.produtos}`,
+    `Maior dificuldade: ${dados.dificuldade}`,
     `Faturamento: ${dados.faturamento}`,
-    `Quero no ar: ${dados.quando}`,
+    `Quem decide: ${dados.decisor}`,
   ].join('\n');
 
   const concluir = (dados) => {
     form.hidden = true;
     obrigado.querySelector('[data-nome]').textContent = dados.nome.split(' ')[0];
     obrigado.querySelector('.resumo').innerHTML = '';
-    for (const [rotulo, valor] of [['Quer', dados.produtos], ['Empresa', dados.empresa], ['Vende em', dados.canal], ['Faturamento', dados.faturamento], ['Quer no ar', dados.quando]]) {
+    for (const [rotulo, valor] of [['Área', dados.area], ['Quer', dados.produtos], ['Maior dificuldade', dados.dificuldade], ['Faturamento', dados.faturamento], ['Quem decide', dados.decisor]]) {
       const li = document.createElement('li');
       const b = document.createElement('b');
       b.textContent = `${rotulo}: `;
@@ -208,13 +212,13 @@
     const fd = new FormData(form);
     const url = new URL(window.location.href);
     const dados = {
+      area: escolhido('area'),
       produtos: escolhido('produtos'),
+      dificuldade: escolhido('dificuldade'),
+      faturamento: escolhido('faturamento'),
+      decisor: escolhido('decisor'),
       nome: String(fd.get('nome') || '').trim(),
       whatsapp: digitos(String(fd.get('whatsapp') || '')),
-      empresa: String(fd.get('empresa') || '').trim(),
-      canal: escolhido('canal'),
-      faturamento: escolhido('faturamento'),
-      quando: escolhido('quando'),
       oferta: pagina.dataset.oferta,
       pagina: url.origin + url.pathname,
       event_id: (crypto.randomUUID && crypto.randomUUID()) || String(Date.now()),
