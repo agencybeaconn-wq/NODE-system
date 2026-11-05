@@ -2,8 +2,8 @@
 // Sem JS a página continua inteira: o formulário aparece com todos os passos à vista.
 (() => {
   const CONFIG = {
-    // PENDENTE: função de lead endurecida (Zod, anti-spam, aba "Anúncios" do comercial). Vazio = modo teste, nada sai da página.
-    endpoint: '',
+    // Só no domínio da NODE o lead vai pro sistema; em localhost fica em modo teste (nada sai da página).
+    endpoint: location.hostname.endsWith('agencynode.online') ? 'https://gbmbrjvkayzwhdwnqjpi.supabase.co/functions/v1/receive-external-lead' : '',
     // WhatsApp do comercial (Matheus), só dígitos com DDI. Passado pelo JV em 04/11/2026.
     whatsapp: '5531995194872',
   };
@@ -23,6 +23,16 @@
   const rastrear = (evento, dados, id) => {
     if (typeof window.fbq === 'function') window.fbq('track', evento, dados || {}, id ? { eventID: id } : undefined);
   };
+
+  // Cada serviço que a pessoa realmente vê vira um ViewContent (uma vez por serviço), pra o Meta saber o que interessou.
+  if ('IntersectionObserver' in window) {
+    const vistos = new IntersectionObserver((entradas) => entradas.forEach((e) => {
+      if (!e.isIntersecting) return;
+      vistos.unobserve(e.target);
+      rastrear('ViewContent', { content_name: e.target.id, content_type: 'servico' });
+    }), { threshold: .5 });
+    document.querySelectorAll('#lojas, #sites, #paginas, #motion').forEach((s) => vistos.observe(s));
+  }
 
   // Só um motion toca por vez: dar play num pausa os outros.
   const motions = [...document.querySelectorAll('video[controls]')];
@@ -153,6 +163,9 @@
 
   const escolhido = (nome) => [...form.querySelectorAll(`input[name="${nome}"]:checked`)]
     .map((campo) => campo.nextElementSibling.textContent.trim()).join(', ');
+  // O servidor recebe os valores e é dono dos rótulos; os rótulos aqui só servem pro resumo na tela e no WhatsApp.
+  const valores = (nome) => [...form.querySelectorAll(`input[name="${nome}"]:checked`)].map((campo) => campo.value);
+  const cookie = (nome) => (document.cookie.split('; ').find((c) => c.startsWith(`${nome}=`)) || '').slice(nome.length + 1);
 
   // Produto marcado pelo anúncio (?p=) ou pelo botão do cartão (data-produto).
   const marcar = (produto) => {
@@ -211,24 +224,33 @@
     if (!validar(passos[atual])) return;
     const fd = new FormData(form);
     const url = new URL(window.location.href);
+    const nome = String(fd.get('nome') || '').trim();
     const dados = {
-      area: escolhido('area'),
-      produtos: escolhido('produtos'),
-      dificuldade: escolhido('dificuldade'),
-      faturamento: escolhido('faturamento'),
-      decisor: escolhido('decisor'),
-      nome: String(fd.get('nome') || '').trim(),
+      area: valores('area')[0],
+      produtos: valores('produtos'),
+      dificuldade: valores('dificuldade')[0],
+      faturamento: valores('faturamento')[0],
+      decisor: valores('decisor')[0],
+      nome,
       whatsapp: digitos(String(fd.get('whatsapp') || '')),
       oferta: pagina.dataset.oferta,
       pagina: url.origin + url.pathname,
       event_id: (crypto.randomUUID && crypto.randomUUID()) || String(Date.now()),
     };
     for (const chave of ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'fbclid']) {
-      if (url.searchParams.get(chave)) dados[chave] = url.searchParams.get(chave);
+      if (url.searchParams.get(chave)) dados[chave] = url.searchParams.get(chave).slice(0, 200);
     }
+    // Cookies do pixel: com eles o Meta casa o lead do servidor com quem clicou no anúncio.
+    const fbp = cookie('_fbp');
+    const fbc = cookie('_fbc') || (dados.fbclid ? `fb.1.${Date.now()}.${dados.fbclid}` : '');
+    if (fbp) dados.fbp = fbp;
+    if (fbc) dados.fbc = fbc;
+    if (document.referrer) dados.referrer = document.referrer.slice(0, 300);
+    // Versão legível, só pra tela de obrigado e pro WhatsApp.
+    const legivel = { nome, area: escolhido('area'), produtos: escolhido('produtos'), dificuldade: escolhido('dificuldade'), faturamento: escolhido('faturamento'), decisor: escolhido('decisor') };
 
     // Robô que preencheu o campo escondido vê a tela de obrigado e nada é gravado.
-    if (String(fd.get('site_empresa') || '')) { concluir(dados); return; }
+    if (String(fd.get('site_empresa') || '')) { concluir(legivel); return; }
 
     const enviar = form.querySelector('button[type=submit]');
     const erro = passos[atual].querySelector('.erro');
@@ -246,8 +268,8 @@
       } else {
         console.info('[modo teste] lead não enviado:', dados);
       }
-      rastrear('Lead', { content_name: dados.oferta }, dados.event_id);
-      concluir(dados);
+      rastrear('Lead', { content_name: dados.oferta, content_category: dados.produtos.join(',') }, dados.event_id);
+      concluir(legivel);
     } catch {
       erro.textContent = 'Não deu pra enviar agora. Tenta de novo em alguns segundos.';
       enviar.disabled = false;

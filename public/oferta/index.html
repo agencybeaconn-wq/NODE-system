@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-pixel="1600687831245451">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -13,6 +13,17 @@
   <link rel="preload" href="../comum/fontes/satoshi-400.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="../comum/ofertas.css">
   <script>document.documentElement.classList.add('js');</script>
+  <!-- Meta Pixel da NODE: só carrega quando data-pixel no <html> tiver o id do conjunto de dados. -->
+  <script>
+    (function () {
+      var id = document.documentElement.dataset.pixel;
+      // Só no domínio da NODE: visita em localhost não pode virar evento no conjunto de dados.
+      if (!id || !location.hostname.endsWith('agencynode.online')) return;
+      !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
+      fbq('init', id);
+      fbq('track', 'PageView');
+    })();
+  </script>
 </head>
 <body data-oferta="black-friday-node" data-oferta-nome="Black Friday">
 

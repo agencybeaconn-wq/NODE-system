@@ -82,6 +82,14 @@ type Visao = "ligar" | "kanban";
 const TODOS = "__todos__";
 const SEM = "__sem__";
 const MEUS = "__meus__";
+// Origem do lead: o anúncio marca utm_source "anuncio-oferta" (ou a landing /oferta) e o Radar marca "radar-clientes".
+const ANUNCIO = "__anuncio__";
+const RADAR = "__radar__";
+const OUTRAS = "__outras__";
+const origemDoLead = (l: { utm_source?: string | null; landing_page?: string | null }) =>
+    l.utm_source === "radar-clientes" ? RADAR
+        : (l.utm_source === "anuncio-oferta" || (l.landing_page || "").includes("/oferta")) ? ANUNCIO
+            : OUTRAS;
 
 const lerVisao = (): Visao => {
     try {
@@ -109,6 +117,7 @@ export default function Comercial() {
     const [visao, setVisaoState] = useState<Visao>(lerVisao);
     const [fNicho, setFNicho] = useState(TODOS);
     const [fDono, setFDono] = useState(TODOS);
+    const [fOrigem, setFOrigem] = useState(TODOS);
     const setVisao = (v: Visao) => {
         setVisaoState(v);
         try { localStorage.setItem("crm_visao", v); } catch { /* preferência só deste navegador */ }
@@ -130,13 +139,19 @@ export default function Comercial() {
     }, [leads]);
     // Nicho vale pra tudo. Responsável não mexe na coluna Lead (1ª coluna): ela é a fila de todos.
     const colunaLead = columns[0]?.id;
+    const leadsPorOrigem = useMemo(() => {
+        const m = new Map<string, number>();
+        for (const l of leads) { const o = origemDoLead(l); m.set(o, (m.get(o) ?? 0) + 1); }
+        return m;
+    }, [leads]);
     const leadsFiltrados = useMemo(() => leads.filter((l) => {
+        if (fOrigem !== TODOS && origemDoLead(l) !== fOrigem) return false;
         if (fNicho === SEM ? !!l.segment : fNicho !== TODOS && l.segment !== fNicho) return false;
         if (!l.column_id || l.column_id === colunaLead) return true;
         if (fDono === MEUS) return l.owner_id === user?.id;
         if (fDono === SEM) return !l.owner_id;
         return fDono === TODOS || l.owner_id === fDono;
-    }), [leads, fNicho, fDono, user?.id, colunaLead]);
+    }), [leads, fOrigem, fNicho, fDono, user?.id, colunaLead]);
 
     const handleSavePhone = () => {
         localStorage.setItem('lever_comercial_phone', comercialPhone);
@@ -372,6 +387,15 @@ export default function Comercial() {
                             </button>
                         ))}
                     </div>
+                    <Select value={fOrigem} onValueChange={setFOrigem}>
+                        <SelectTrigger className="h-10 w-[180px]" aria-label="Origem"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value={TODOS}>Todas as origens</SelectItem>
+                            <SelectItem value={ANUNCIO}>Anúncio ({leadsPorOrigem.get(ANUNCIO) ?? 0})</SelectItem>
+                            <SelectItem value={RADAR}>Radar ({leadsPorOrigem.get(RADAR) ?? 0})</SelectItem>
+                            <SelectItem value={OUTRAS}>Outras ({leadsPorOrigem.get(OUTRAS) ?? 0})</SelectItem>
+                        </SelectContent>
+                    </Select>
                     <Select value={fNicho} onValueChange={setFNicho}>
                         <SelectTrigger className="h-10 w-[180px]" aria-label="Nicho"><SelectValue /></SelectTrigger>
                         <SelectContent>
