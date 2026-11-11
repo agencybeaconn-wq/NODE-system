@@ -98,6 +98,7 @@ export function DemandForm({ clientId: propClientId, workspaceId, clientName: pr
 
                     if (uploadError) {
                         console.error("Upload error:", uploadError);
+                        toast.error(`Anexo ${file.name} não foi enviado: ${uploadError.message}`);
                         continue;
                     }
 
@@ -127,8 +128,9 @@ export function DemandForm({ clientId: propClientId, workspaceId, clientName: pr
 
             if (error) throw error;
 
-            toast.success("Demanda enviada com sucesso!", {
-                description: "Nossa equipe irá analisar sua solicitação em breve.",
+            // O banco cria o card no quadro e avisa a equipe na mesma transação do INSERT.
+            toast.success("Demanda enviada!", {
+                description: "O card já está no quadro de Demandas, na coluna A fazer.",
             });
 
             // Reset form

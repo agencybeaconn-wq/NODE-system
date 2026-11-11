@@ -98,6 +98,7 @@ import {
   Cog6ToothIcon,
   DevicePhoneMobileIcon,
   ViewfinderCircleIcon,
+  InboxArrowDownIcon,
 } from "@heroicons/react/24/outline";
 // Variantes preenchidas pro item ATIVO (padrão iOS: outline em repouso, solid ativo)
 import {
@@ -111,6 +112,7 @@ import {
   Cog6ToothIcon as Cog6ToothSolid,
   DevicePhoneMobileIcon as DevicePhoneMobileSolid,
   ViewfinderCircleIcon as ViewfinderCircleSolid,
+  InboxArrowDownIcon as InboxArrowDownSolid,
 } from "@heroicons/react/24/solid";
 import { useRadarAccess } from "@/hooks/useRadarAccess";
 
@@ -137,6 +139,8 @@ interface MenuItem {
 const mainMenuItems: MenuItem[] = [
   // ─── Seção: Agência ───
   { section: 'agency', title: "Demandas", transKey: "sidebar.tasks", url: "/tasks", icon: ClipboardDocumentListIcon },
+  // Histórico das solicitações abertas por clientes (cada uma já vira card em Demandas).
+  { section: 'agency', title: "Solicitações", transKey: "sidebar.request_demand", url: "/solicitacoes", icon: InboxArrowDownIcon },
   { section: 'agency', title: "Prioridades", transKey: "sidebar.priorities", url: "/prioridades", icon: FlagIcon },
   { section: 'agency', title: "Comercial", transKey: "sidebar.crm", url: "/comercial", icon: DocumentTextIcon },
   // Radar: só pra quem tem radar_can_view() no banco (filtro abaixo).
@@ -315,6 +319,7 @@ export function AppSidebar() {
     [Cog6ToothIcon, Cog6ToothSolid],
     [DevicePhoneMobileIcon, DevicePhoneMobileSolid],
     [ViewfinderCircleIcon, ViewfinderCircleSolid],
+    [InboxArrowDownIcon, InboxArrowDownSolid],
   ]);
 
   const renderIcon = (Icon: IconComponent, className?: string, active = false) => {

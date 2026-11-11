@@ -255,15 +255,9 @@ export default function Solicitacoes() {
             const { data, error } = await query;
 
             if (error) throw error;
-            const fetchedDemands = data || [];
-            setDemands(fetchedDemands);
-
-            // Auto-aprova demandas pendentes que vieram do portal
-            const pending = fetchedDemands.filter((d: DemandRequest) => d.status === 'pending');
-            for (const demand of pending) {
-                // Roda em background sem travar a UI
-                autoApproveDemand(demand.id);
-            }
+            // O card no quadro é criado pelo banco no INSERT da solicitação
+            // (trigger demand_requests_after_insert). Aqui só listamos.
+            setDemands(data || []);
         } catch (error: any) {
             console.error("Error fetching demands:", error);
             const errorMsg = error.message || "Erro desconhecido";
@@ -519,12 +513,6 @@ export default function Solicitacoes() {
         }
     };
 
-    // Auto-aprovação: demandas pendentes do portal são aprovadas automaticamente
-    // e atribuídas diretamente no Kanban sem intervenção manual.
-    const autoApproveDemand = async (id: string) => {
-        await handleAction(id, 'approved');
-    };
-
     const handleAction = async (id: string, newStatus: DemandStatus, assigneeId?: string) => {
         // ─── LOCK contra clique duplo ───────────────────────────
         // Se essa demanda já está sendo processada, ignora.
@@ -536,9 +524,6 @@ export default function Solicitacoes() {
         setProcessingIds(prev => new Set(prev).add(id));
 
         try {
-            const demand = demands.find(d => d.id === id);
-            if (!demand) throw new Error("Solicitação não encontrada");
-
             // ─── 1. Atualizar status com guarda de idempotência ──
             // Inclui WHERE status='pending' no UPDATE: se outro processo já mudou
             // pra 'approved' ou 'rejected', a query retorna 0 rows e abortamos.
@@ -564,9 +549,10 @@ export default function Solicitacoes() {
                 // Se demand.task_id já existir, usa o existente em vez de criar duplicata.
                 const { data: freshDemand } = await (supabase as any)
                     .from('demand_requests')
-                    .select('task_id, client_id, workspace_id, title, description, client_priority, attachments')
+                    .select('task_id, client_id, workspace_id, title, description, area, client_priority, attachments')
                     .eq('id', id)
                     .single();
+                if (!freshDemand) throw new Error("Solicitação não encontrada");
                 const existingTaskId = freshDemand?.task_id;
 
                 if (existingTaskId && existingTaskId.trim() !== "" && existingTaskId !== 'null') {
@@ -593,14 +579,17 @@ export default function Solicitacoes() {
                     }
                 } else {
                     // Nenhuma task vinculada ainda — cria uma.
-                    const d = freshDemand || demand;
+                    const d = freshDemand;
                     const { data: newTask, error: taskError } = await (supabase as any)
                         .from('client_tasks')
                         .insert({
                             client_id: d.client_id,
                             workspace_id: d.workspace_id,
                             title: `[SOLICITAÇÃO] ${d.title}`,
-                            description: d.description,
+                            description: `Área: ${d.area}\n\n${d.description || ''}`,
+                            area: d.area ? String(d.area).toLowerCase() : null,
+                            category: 'Solicitação do cliente',
+                            source: 'demand_request',
                             priority: d.client_priority === 'urgente' ? 'critical' :
                                 d.client_priority === 'alta' ? 'high' :
                                     d.client_priority === 'normal' ? 'medium' : 'low',

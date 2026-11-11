@@ -9,6 +9,7 @@ import {
     UserGroupIcon,
     CalendarDaysIcon,
     ViewfinderCircleIcon,
+    InboxArrowDownIcon,
 } from "@heroicons/react/24/outline";
 import type { ComponentType, SVGProps } from "react";
 import {
@@ -19,6 +20,7 @@ import {
     CalendarDaysIcon as CalendarDaysSolid,
     ClipboardDocumentCheckIcon as ClipboardDocumentCheckSolid,
     ViewfinderCircleIcon as ViewfinderCircleSolid,
+    InboxArrowDownIcon as InboxArrowDownSolid,
 } from "@heroicons/react/24/solid";
 import { NavLink, useLocation } from "react-router-dom";
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -44,6 +46,8 @@ interface MenuItem { title: string; icon: Icon; url?: string; submenu?: SubItem[
 const MENU: MenuItem[] = [
     // Demandas e Clientes viram itens únicos (dropdowns removidos a pedido).
     { title: "Demandas", icon: ClipboardDocumentListIcon, url: "/agency/general-board" },
+    // Histórico das solicitações abertas por clientes (cada uma já vira card em Demandas).
+    { title: "Solicitações", icon: InboxArrowDownIcon, url: "/agency/solicitacoes" },
     { title: "Prioridades", icon: FlagIcon, url: "/agency/prioridades" },
     { title: "Comercial", icon: ArrowTrendingUpIcon, url: "/agency/comercial" },
     { title: "Clientes", icon: UserGroupIcon, url: "/agency/clients" },
@@ -63,6 +67,7 @@ const RADAR_ITEM: MenuItem = { title: "Radar", icon: ViewfinderCircleIcon, url: 
 // Ativo = ícone preenchido (padrão iOS), repouso = outline.
 const SOLID_MAP = new Map<Icon, Icon>([
     [ViewfinderCircleIcon, ViewfinderCircleSolid],
+    [InboxArrowDownIcon, InboxArrowDownSolid],
     [ClipboardDocumentListIcon, ClipboardDocumentListSolid],
     [FlagIcon, FlagSolid],
     [ArrowTrendingUpIcon, ArrowTrendingUpSolid],

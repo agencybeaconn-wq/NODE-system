@@ -412,7 +412,11 @@ export default function BriefingForm() {
                     .map(r => ({ ...r, client_id: client.id }));
 
                 if (pricingRows.length > 0) {
-                    await (supabase as any).from('client_pricing').upsert(pricingRows, { onConflict: 'client_id,section,key' });
+                    // supabase-js não lança exceção em erro de banco/RLS: precisa ler { error }.
+                    const { error: pricingError } = await (supabase as any)
+                        .from('client_pricing')
+                        .upsert(pricingRows, { onConflict: 'client_id,section,key' });
+                    if (pricingError) throw pricingError;
                 }
             } catch (pricingErr: any) {
                 console.error('Erro ao sincronizar preços:', pricingErr);
@@ -456,8 +460,11 @@ ${answersText}`,
                 toast.warning('Briefing salvo, mas o resumo IA falhou. Pode ser gerado depois.');
             }
 
-            // Mark "Call de Briefing" task as completed
-            try {
+            // Quadro de demandas: só a equipe escreve em client_tasks (RLS).
+            // No portal, o banco avisa a equipe (trigger briefings_notify_staff) e as
+            // demandas de implementação são geradas em Briefing > Arquivos.
+            if (!isPortalMode) {
+                // Mark "Call de Briefing" task as completed
                 let briefingTaskQuery = (supabase as any).from('client_tasks')
                     .update({ status: 'concluido', completed_at: new Date().toISOString() })
                     .eq('client_id', client.id)
@@ -466,17 +473,26 @@ ${answersText}`,
                 if (workspaceId) {
                     briefingTaskQuery = briefingTaskQuery.eq('workspace_id', workspaceId);
                 }
-                await briefingTaskQuery;
-            } catch (e) { console.error('Erro ao concluir task de briefing:', e); }
+                const { error: callTaskError } = await briefingTaskQuery;
+                if (callTaskError) console.error('Erro ao concluir task de briefing:', callTaskError);
 
-            // Generate implementation tasks from briefing answers
-            try {
-                const { BriefingAutomationService } = await import('@/services/automations/BriefingAutomationService');
-                await BriefingAutomationService.generateTasksFromBriefing(client.id, briefing.id, workspaceId);
-                toast.success('Demandas de implementação geradas automaticamente!');
-            } catch (taskErr) {
-                console.error('Erro ao gerar demandas:', taskErr);
-                toast.warning('Briefing salvo, mas as demandas automáticas falharam.');
+                // Generate implementation tasks from briefing answers.
+                // generateTasksFromBriefing devolve { error } ou { skipped } em vez de lançar.
+                try {
+                    const { BriefingAutomationService } = await import('@/services/automations/BriefingAutomationService');
+                    const result: any = await BriefingAutomationService.generateTasksFromBriefing(client.id, briefing.id, workspaceId);
+                    if (result?.error) {
+                        const msg = typeof result.error === 'string' ? result.error : result.error?.message || 'erro desconhecido';
+                        toast.warning('Briefing salvo, mas as demandas automáticas falharam: ' + msg);
+                    } else if (result?.skipped) {
+                        toast.info('As demandas deste cliente já existiam e foram mantidas.');
+                    } else {
+                        toast.success(`Demandas de implementação geradas (${result?.data?.length || 0} tarefas).`);
+                    }
+                } catch (taskErr: any) {
+                    console.error('Erro ao gerar demandas:', taskErr);
+                    toast.warning('Briefing salvo, mas as demandas automáticas falharam: ' + (taskErr?.message || 'erro desconhecido'));
+                }
             }
 
             if (isPortalMode) {

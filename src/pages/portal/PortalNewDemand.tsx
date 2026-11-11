@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,8 +12,9 @@ import { toast } from "sonner";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { Loader2, ClipboardList, Send, Sparkles, ImagePlus, X, FileImage } from "lucide-react";
 
-// Fallback options if API fails
-const FALLBACK_AREA_OPTIONS = [
+// Áreas que o cliente escolhe. O responsável de cada área é resolvido no banco
+// (trigger demand_requests_after_insert), nunca no navegador.
+const AREA_OPTIONS = [
     { value: "Gestão", label: "Gestão" },
     { value: "Tráfego", label: "Tráfego" },
     { value: "Design", label: "Design" },
@@ -39,20 +40,11 @@ interface FilePreview {
     id: string;
 }
 
-interface SectorOption {
-    value: string; // This will be the Role Name (e.g., "Design")
-    label: string;
-    assigneeId?: string; // ID of the member assigned to this sector
-}
-
 export default function PortalNewDemand() {
     const { clientData, workspaceId: dashboardWorkspaceId } = useDashboard();
     const { user } = useAuth();
     const { linkedClientId } = usePermissions();
 
-    // SOURCE OF TRUTH: linkedClientId from PermissionsContext (Universal Bridge)
-    const activeClientId = linkedClientId || clientData?.id;
-    const activeWorkspaceId = dashboardWorkspaceId || clientData?.workspace_id;
 
     const [title, setTitle] = useState("");
     const [area, setArea] = useState("");
@@ -61,88 +53,8 @@ export default function PortalNewDemand() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [files, setFiles] = useState<FilePreview[]>([]);
     const [isDragging, setIsDragging] = useState(false);
-    const [sectorOptions, setSectorOptions] = useState<SectorOption[]>([]);
-    const [isLoadingSectors, setIsLoadingSectors] = useState(true);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
-
-    // Fetch Sectors and Members for Auto-Assignment
-    useEffect(() => {
-        const fetchSectors = async () => {
-            if (!activeWorkspaceId) return;
-
-            try {
-                // 1. Fetch available roles (Sectors)
-                const { data: rolesData, error: rolesError } = await (supabase as any)
-                    .from('agency_roles')
-                    .select('id, name')
-                    .order('name');
-
-                if (rolesError) throw rolesError;
-
-                // 2. Fetch members and their roles to map Sector -> Member
-                // We join member_roles to find who has what role
-                const { data: membersData, error: membersError } = await (supabase as any)
-                    .from('member_roles')
-                    .select(`
-                        role_id,
-                        member_id
-                    `);
-
-                if (membersError) throw membersError;
-
-                const roleIdToMemberMap = new Map<string, string>(); // roleId -> memberId
-
-                if (membersData) {
-                    membersData.forEach((mr: any) => {
-                        if (!roleIdToMemberMap.has(mr.role_id)) {
-                            roleIdToMemberMap.set(mr.role_id, mr.member_id);
-                        }
-                    });
-                }
-
-                // Create a map of Role Name -> Member ID
-                const roleNameToMemberMap = new Map<string, string>();
-                if (rolesData) {
-                    rolesData.forEach((role: any) => {
-                        const memberId = roleIdToMemberMap.get(role.id);
-                        if (memberId) {
-                            roleNameToMemberMap.set(role.name, memberId);
-                        }
-                    });
-                }
-
-                // Map FALLBACK options to available assignees
-                // This ensures the list is always what the user expects ("Tráfego", "Design", etc.)
-                // but still enables auto-assignment if the role exists in DB.
-                const finalOptions = FALLBACK_AREA_OPTIONS.map(opt => {
-                    let assigneeId = undefined;
-                    // Case-insensitive lookup
-                    const matchingRoleName = Array.from(roleNameToMemberMap.keys())
-                        .find(key => key.toLowerCase() === opt.value.toLowerCase());
-
-                    if (matchingRoleName) {
-                        assigneeId = roleNameToMemberMap.get(matchingRoleName);
-                    }
-
-                    return {
-                        ...opt,
-                        assigneeId
-                    };
-                });
-
-                setSectorOptions(finalOptions);
-
-            } catch (error) {
-                console.error("Error fetching sectors:", error);
-                setSectorOptions(FALLBACK_AREA_OPTIONS);
-            } finally {
-                setIsLoadingSectors(false);
-            }
-        };
-
-        fetchSectors();
-    }, [activeWorkspaceId]);
 
     const addFiles = useCallback((newFiles: FileList | File[]) => {
         const fileArray = Array.from(newFiles);
@@ -195,47 +107,43 @@ export default function PortalNewDemand() {
         }
     };
 
-    const uploadFiles = async (): Promise<string[]> => {
-        if (files.length === 0) return [];
-
+    // Sobe os anexos e devolve URL pública + caminho (o caminho serve pra limpar
+    // os arquivos se a solicitação não for gravada). Se um upload falhar no meio,
+    // apaga os que já subiram e propaga o erro.
+    const uploadFiles = async (clientId: string): Promise<{ urls: string[]; paths: string[] }> => {
         const urls: string[] = [];
+        const paths: string[] = [];
         for (const fp of files) {
             const ext = fp.file.name.split('.').pop() || 'png';
-            const path = `demands/${activeClientId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+            const path = `demands/${clientId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
             const { data, error } = await supabase.storage
                 .from('attachments')
                 .upload(path, fp.file, { upsert: false });
 
             if (error) {
-                console.error('[PortalNewDemand] Upload error:', error);
+                await removeUploaded(paths);
                 throw new Error(`Falha no upload de ${fp.file.name}: ${error.message}`);
             }
 
-            const { data: publicData } = supabase.storage
-                .from('attachments')
-                .getPublicUrl(data.path);
-
-            urls.push(publicData.publicUrl);
+            paths.push(data.path);
+            urls.push(supabase.storage.from('attachments').getPublicUrl(data.path).data.publicUrl);
         }
-        return urls;
+        return { urls, paths };
+    };
+
+    const removeUploaded = async (paths: string[]) => {
+        if (paths.length === 0) return;
+        const { error } = await supabase.storage.from('attachments').remove(paths);
+        if (error) console.error('[PortalNewDemand] Falha ao limpar anexos órfãos:', error);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        // SOURCE OF TRUTH: linkedClientId from PermissionsContext
+        // SOURCE OF TRUTH: linkedClientId from PermissionsContext.
+        // O workspace e o autor são definidos pelo banco (trigger), não pelo navegador.
         const finalClientId = linkedClientId || clientData?.id;
-        const finalWorkspaceId = dashboardWorkspaceId || clientData?.workspace_id;
-
-        console.log('[PortalNewDemand] Form Submit:', {
-            title,
-            area,
-            finalClientId,
-            finalWorkspaceId,
-            userId: user?.id,
-            fileCount: files.length
-        });
 
         if (!title.trim() || !area || !description.trim()) {
             toast.error("Por favor, preencha todos os campos obrigatórios.");
@@ -247,96 +155,62 @@ export default function PortalNewDemand() {
             return;
         }
 
-        if (!finalWorkspaceId) {
+        const workspaceId = dashboardWorkspaceId || clientData?.workspace_id;
+        if (!workspaceId) {
             toast.error("Erro de identificação do workspace. Tente recarregar a página.");
             return;
         }
 
         setIsSubmitting(true);
+        let uploadedPaths: string[] = [];
 
         try {
-            // Find auto-assignee
-            const selectedSector = sectorOptions.find(s => s.value === area);
-            const assigneeId = selectedSector?.assigneeId || null;
-
-            console.log(`[PortalNewDemand] Auto-assigning to: ${assigneeId} (Sector: ${area})`);
-
-            // Upload files first
             let attachmentUrls: string[] = [];
             if (files.length > 0) {
-                attachmentUrls = await uploadFiles();
-                console.log('[PortalNewDemand] Uploaded', attachmentUrls.length, 'files');
+                const uploaded = await uploadFiles(finalClientId);
+                attachmentUrls = uploaded.urls;
+                uploadedPaths = uploaded.paths;
             }
 
-            // 1. Criar automaticamente no Kanban (Coluna Triagem)
-            const { data: newTask, error: taskError } = await supabase
-                .from('client_tasks')
-                .insert({
-                    client_id: finalClientId,
-                    workspace_id: finalWorkspaceId,
-                    title: `[PORTAL] ${title}`,
-                    description: `Área: ${area}\n\n${description}`,
-                    status: 'pending',
-                    priority: priority === 'urgente' ? 'critical' :
-                        priority === 'alta' ? 'high' :
-                            priority === 'normal' ? 'medium' : 'low',
-                    category: "Solicitação Portal",
-                    assignee_id: assigneeId,
-                    attachments: attachmentUrls.length > 0
-                        ? attachmentUrls.map(url => ({ url, name: url.split('/').pop() || 'file', type: 'image' }))
-                        : [],
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                })
-                .select('id')
-                .single();
-
-            if (taskError) {
-                console.error("[PortalNewDemand] Erro ao criar task no Kanban (esperado para clientes - RLS):", taskError);
-                // Task não criada — solicitação será criada sem link, e task será gerada na aprovação
-            }
-
-            // 2. Registrar Solicitação (Audit/Inbox) vinculada à task
-            const { error: reqError } = await supabase
+            // Um único INSERT. O banco cria o card no quadro "A fazer", define o
+            // responsável pela área, vincula task_id e avisa a equipe, tudo na mesma
+            // transação: se gravou, o card existe.
+            const { data: created, error: reqError } = await supabase
                 .from('demand_requests')
                 .insert({
                     client_id: finalClientId,
-                    workspace_id: finalWorkspaceId,
-                    title,
-                    description,
+                    workspace_id: workspaceId,
+                    title: title.trim(),
+                    description: description.trim(),
                     area,
                     client_priority: priority,
                     status: "pending",
                     created_by: user.id,
-                    task_id: newTask?.id || null,
-                    attachments: attachmentUrls.length > 0 ? attachmentUrls : null
-                });
+                    attachments: attachmentUrls,
+                })
+                .select('id')
+                .single();
 
-            if (reqError) {
-                console.error("[PortalNewDemand] Erro ao criar solicitação:", reqError);
-                // Rollback: se task foi criada mas solicitação falhou, deletar task órfã
-                if (newTask?.id) {
-                    await supabase.from('client_tasks').delete().eq('id', newTask.id);
-                }
-                throw reqError;
+            if (reqError || !created) {
+                await removeUploaded(uploadedPaths);
+                throw reqError || new Error("A solicitação não foi gravada.");
             }
 
-            toast.success("Demanda enviada com sucesso!", {
-                description: assigneeId
-                    ? `Sua solicitação foi registrada e atribuída automaticamente ao responsável de ${area}.`
-                    : "Sua solicitação foi registrada e nossa equipe já foi notificada."
+            toast.success("Demanda enviada!", {
+                description: "Ela já está no quadro da nossa equipe. Acompanhe pelo Quadro de Demandas.",
             });
 
-            // Reset
             setTitle("");
             setArea("");
+            setPriority("normal");
             setDescription("");
-            // Clean up preview URLs
             files.forEach(f => { if (f.previewUrl) URL.revokeObjectURL(f.previewUrl); });
             setFiles([]);
         } catch (error: any) {
-            console.error("Erro ao enviar demanda:", error);
-            toast.error("Erro ao enviar demanda: " + error.message);
+            console.error("[PortalNewDemand] Erro ao enviar demanda:", error);
+            toast.error("Não foi possível enviar a demanda", {
+                description: error?.message || "Tente novamente em instantes.",
+            });
         } finally {
             setIsSubmitting(false);
         }
@@ -360,7 +234,7 @@ export default function PortalNewDemand() {
                         <div>
                             <CardTitle className="text-xl font-bold flex items-center gap-2">
                                 <ClipboardList className="w-5 h-5 text-primary" />
-                                Details da Solicitação
+                                Detalhes da Solicitação
                             </CardTitle>
                             <CardDescription className="text-sm">
                                 Explique o que precisa ser feito com o máximo de clareza.
@@ -393,12 +267,12 @@ export default function PortalNewDemand() {
                                             Área Responsável
                                             <span className="text-red-500 font-bold">*</span>
                                         </Label>
-                                        <Select value={area} onValueChange={setArea} required disabled={isLoadingSectors}>
+                                        <Select value={area} onValueChange={setArea} required>
                                             <SelectTrigger className="h-12 text-base border-border/60 bg-background">
-                                                <SelectValue placeholder={isLoadingSectors ? "Carregando..." : "Selecionar área..."} />
+                                                <SelectValue placeholder="Selecionar área..." />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                {sectorOptions.map(opt => (
+                                                {AREA_OPTIONS.map(opt => (
                                                     <SelectItem key={opt.value} value={opt.value} className="text-base py-3">
                                                         {opt.label}
                                                     </SelectItem>
