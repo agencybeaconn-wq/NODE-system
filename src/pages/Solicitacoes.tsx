@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { DemandForm } from "@/components/demands/DemandForm";
+import { demandAreaLabel } from "@/config/demandAreas";
 import { DemandStatusBadge, DemandStatus } from "@/components/demands/DemandStatusBadge";
 import { DemandPrioritySelector, DemandPriority } from "@/components/demands/DemandPrioritySelector";
 import { Card } from "@/components/ui/card";
@@ -586,8 +587,8 @@ export default function Solicitacoes() {
                             client_id: d.client_id,
                             workspace_id: d.workspace_id,
                             title: `[SOLICITAÇÃO] ${d.title}`,
-                            description: `Área: ${d.area}\n\n${d.description || ''}`,
-                            area: d.area ? String(d.area).toLowerCase() : null,
+                            description: `Área: ${demandAreaLabel(d.area)}\n\n${d.description || ''}`,
+                            area: d.area || null,
                             category: 'Solicitação do cliente',
                             source: 'demand_request',
                             priority: d.client_priority === 'urgente' ? 'critical' :
@@ -840,7 +841,7 @@ export default function Solicitacoes() {
                                                         </div>
                                                         <div className="flex items-center gap-2 mb-3 flex-wrap">
                                                             <span className="text-[10px] font-medium text-muted-foreground uppercase bg-muted/50 px-1.5 py-0.5 rounded">
-                                                                {demand.area}
+                                                                {demandAreaLabel(demand.area)}
                                                             </span>
                                                             {demand.triage_result?.suggestedSkill && (
                                                                 <span className="text-[10px] font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded">
@@ -1466,7 +1467,7 @@ export default function Solicitacoes() {
                                         {selectedDemand.client_priority}
                                     </span>
                                     <span className="px-3 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground uppercase">
-                                        {selectedDemand.area}
+                                        {demandAreaLabel(selectedDemand.area)}
                                     </span>
                                     <DemandStatusBadge status={selectedDemand.status} />
                                 </div>

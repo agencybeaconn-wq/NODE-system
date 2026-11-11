@@ -17,6 +17,7 @@ import {
 import { DemandPrioritySelector, DemandPriority } from "./DemandPrioritySelector";
 import { Loader2, Upload, X, FileIcon, Image as ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DEMAND_AREAS } from "@/config/demandAreas";
 import nodeTile from "@/assets/node-tile.png";
 
 interface DemandFormProps {
@@ -27,15 +28,6 @@ interface DemandFormProps {
 }
 
 type AreaType = 'estrategico' | 'trafego' | 'shopify' | 'design' | 'n8n' | 'outro';
-
-const areaOptions: { value: string; label: string }[] = [
-    { value: 'estrategico', label: 'Estratégico' },
-    { value: 'trafego', label: 'Tráfego' },
-    { value: 'shopify', label: 'Shopify' },
-    { value: 'projeto', label: 'Projeto' },
-    { value: 'design', label: 'Design' },
-    { value: 'outro', label: 'Outro' },
-];
 
 export function DemandForm({ clientId: propClientId, workspaceId, clientName: propClientName, onSuccess }: DemandFormProps) {
     const { clientData, clients } = useDashboard();
@@ -213,7 +205,7 @@ export function DemandForm({ clientId: propClientId, workspaceId, clientName: pr
                         <SelectValue placeholder="Selecionar opção..." />
                     </SelectTrigger>
                     <SelectContent className="bg-card border-border">
-                        {areaOptions.map(opt => (
+                        {DEMAND_AREAS.map(opt => (
                             <SelectItem key={opt.value} value={opt.value} className="py-3 focus:bg-primary/10 transition-colors">
                                 {opt.label}
                             </SelectItem>

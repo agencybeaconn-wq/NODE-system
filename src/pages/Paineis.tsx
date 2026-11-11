@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { cn } from "@/lib/utils";
+import { DEMAND_AREAS, demandAreaLabel } from "@/config/demandAreas";
 import {
     ClipboardList,
     Clock,
@@ -56,9 +57,6 @@ const statusStyle = (s: string) => {
     return "bg-primary/15 text-primary border border-primary/20";
 };
 
-const AREA_LABELS: Record<string, string> = {
-    traffic: "Tráfego", design: "Design", dev: "Dev", copy: "Copy", strategy: "Estratégia",
-};
 const PRIORITY_LABELS: Record<string, string> = {
     low: "Baixa", medium: "Normal", high: "Alta", critical: "Urgente",
 };
@@ -179,7 +177,7 @@ export default function Paineis() {
             memberPhone: member?.phone || null,
             assigneeId: t.assignee_id,
             clientName: clientMap.get(t.client_id) || "—",
-            areaLabel: t.area ? AREA_LABELS[t.area] || t.area : "—",
+            areaLabel: demandAreaLabel(t.area),
             priorityLabel: PRIORITY_LABELS[t.priority] || t.priority,
         };
     });
@@ -576,11 +574,12 @@ export default function Paineis() {
                                                 className="bg-transparent text-xs font-medium text-muted-foreground cursor-pointer focus:outline-none hover:text-foreground transition-colors"
                                             >
                                                 <option value="">—</option>
-                                                <option value="traffic">Tráfego</option>
-                                                <option value="design">Design</option>
-                                                <option value="dev">Dev</option>
-                                                <option value="copy">Copy</option>
-                                                <option value="strategy">Estratégia</option>
+                                                {t.area && !DEMAND_AREAS.some(a => a.value === t.area) && (
+                                                    <option value={t.area} disabled>{demandAreaLabel(t.area)}</option>
+                                                )}
+                                                {DEMAND_AREAS.map(a => (
+                                                    <option key={a.value} value={a.value}>{a.label}</option>
+                                                ))}
                                             </select>
                                         </td>
                                         {/* Responsável — editável */}

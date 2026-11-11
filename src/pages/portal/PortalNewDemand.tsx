@@ -10,19 +10,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { usePermissions } from "@/contexts/PermissionsContext";
+import { DEMAND_AREAS } from "@/config/demandAreas";
 import { Loader2, ClipboardList, Send, Sparkles, ImagePlus, X, FileImage } from "lucide-react";
 
 // Áreas que o cliente escolhe. O responsável de cada área é resolvido no banco
 // (trigger demand_requests_after_insert), nunca no navegador.
-const AREA_OPTIONS = [
-    { value: "Gestão", label: "Gestão" },
-    { value: "Tráfego", label: "Tráfego" },
-    { value: "Design", label: "Design" },
-    { value: "Operacional", label: "Operacional" },
-    { value: "Comercial", label: "Comercial" },
-    { value: "Dev", label: "Dev" },
-];
-
 const PRIORITY_OPTIONS = [
     { value: "urgente", label: "Urgente 🔥" },
     { value: "alta", label: "Alta" },
@@ -272,7 +264,7 @@ export default function PortalNewDemand() {
                                                 <SelectValue placeholder="Selecionar área..." />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                {AREA_OPTIONS.map(opt => (
+                                                {DEMAND_AREAS.map(opt => (
                                                     <SelectItem key={opt.value} value={opt.value} className="text-base py-3">
                                                         {opt.label}
                                                     </SelectItem>

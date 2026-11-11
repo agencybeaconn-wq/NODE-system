@@ -12,6 +12,7 @@ import { useTasks } from "@/contexts/TasksContext";
 import { useAgencyTeam } from "@/hooks/useAgencyTeam";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { toast } from "sonner";
+import { DEMAND_AREAS } from "@/config/demandAreas";
 
 interface NewTaskModalProps {
     trigger?: React.ReactNode;
@@ -24,14 +25,6 @@ const PRIORITY_OPTIONS = [
     { value: "medium", label: "Média", color: "bg-orange-500" },
     { value: "high", label: "Alta", color: "bg-red-500" },
     { value: "critical", label: "Crítica", color: "bg-purple-500" },
-];
-
-const AREA_OPTIONS = [
-    { value: "traffic", label: "Tráfego" },
-    { value: "design", label: "Design" },
-    { value: "copy", label: "Copy" },
-    { value: "strategy", label: "Estratégia" },
-    { value: "dev", label: "Desenvolvimento" },
 ];
 
 export function NewTaskModal({ trigger, defaultPhase, onTaskCreated }: NewTaskModalProps) {
@@ -357,7 +350,7 @@ export function NewTaskModal({ trigger, defaultPhase, onTaskCreated }: NewTaskMo
                             className="flex h-10 w-full items-center rounded-md border border-input/50 bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none cursor-pointer"
                         >
                             <option value="" disabled>Selecionar área...</option>
-                            {AREA_OPTIONS.map(opt => (
+                            {DEMAND_AREAS.map(opt => (
                                 <option key={opt.value} value={opt.value}>
                                     {opt.label}
                                 </option>

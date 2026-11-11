@@ -1,3 +1,4 @@
+import type { DemandArea } from "@/config/demandAreas";
 export type ClientStatus = 'onboarding' | 'implementation' | 'growth' | 'churned';
 
 export type ServiceType = 'assessoria_completa' | 'trafego_pago' | 'consultoria';
@@ -67,7 +68,8 @@ export interface Task {
     priority: 'low' | 'medium' | 'high' | 'critical';
     createdAt: string;
     dueDate?: string;
-    area?: 'traffic' | 'design' | 'copy' | 'strategy' | 'dev';
+    // Novas tarefas usam DemandArea; os demais valores só existem em cards antigos.
+    area?: DemandArea | 'traffic' | 'design' | 'copy' | 'strategy' | 'dev';
     // Tipo do projeto (fixo/MRR ou avulso). NULL = herda do cliente pai
     projectType?: 'fixo' | 'avulso' | null;
     // Campos para sincronização com Timeline
