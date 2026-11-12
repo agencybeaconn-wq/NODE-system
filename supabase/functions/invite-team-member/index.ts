@@ -180,7 +180,7 @@ serve(instrument("invite-team-member", async (req) => {
             }
         }
 
-        const PRODUCTION_URL = 'https://agencynode.site';
+        const PRODUCTION_URL = 'https://www.agencynode.online';
         let siteUrl = Deno.env.get('VITE_APP_URL') || PRODUCTION_URL;
         if (site_url && !site_url.includes('localhost') && !site_url.includes('127.0.0.1')) {
             siteUrl = site_url;
@@ -291,7 +291,7 @@ serve(instrument("invite-team-member", async (req) => {
 
         // Link autossuficiente: aponta DIRETO pra produção carregando o token_hash (fluxo verifyOtp).
         // Independe da Site URL do GoTrue (que estava redirecionando o convite pra localhost) e
-        // mantém o domínio do link IGUAL ao do remetente (@agencynode.site) — reduz spam.
+        // mantém o domínio do link IGUAL ao do remetente (@agencynode.online) — reduz spam.
         const tokenHash = linkData?.properties?.hashed_token;
         const verificationType = linkData?.properties?.verification_type || 'magiclink';
         if (!tokenHash) {
@@ -299,10 +299,10 @@ serve(instrument("invite-team-member", async (req) => {
             throw new Error("Falha ao gerar o token do convite (hashed_token ausente)");
         }
         const inviteLink = `${siteUrl}/auth/accept-invite?token_hash=${encodeURIComponent(tokenHash)}&type=${encodeURIComponent(verificationType)}`;
-        const FROM_EMAIL = Deno.env.get('RESEND_FROM_EMAIL') || 'NODE <contato@agencynode.site>';
+        const FROM_EMAIL = Deno.env.get('RESEND_FROM_EMAIL') || 'NODE <contato@agencynode.online>';
         // reply_to em mailbox monitorada faz o e-mail parecer correspondência real (não robô),
         // o que reduz a chance de cair no spam. Sobrescrevível por env.
-        const REPLY_TO = Deno.env.get('RESEND_REPLY_TO') || 'contato@agencynode.site';
+        const REPLY_TO = Deno.env.get('RESEND_REPLY_TO') || 'contato@agencynode.online';
 
         const resEmail = await fetch('https://api.resend.com/emails', {
             method: 'POST',

@@ -391,10 +391,14 @@ export function ClientSettingsView({ client, clientId, onClientUpdate }: ClientS
 
             if (inviteError || inviteData?.error) {
                 console.warn("[PortalAccess] Edge function error:", inviteError || inviteData?.error);
-                // Tenta extrair o corpo da resposta de erro da edge function
+                // Em status não-2xx o motivo real vem no corpo da Response (error.context).
                 let detailedError = inviteData?.error || inviteError?.message;
-                if (inviteError && typeof (inviteError as any).context?.body === 'object') {
-                    detailedError = (inviteError as any).context.body?.error || detailedError;
+                const ctx = (inviteError as any)?.context;
+                if (ctx && typeof ctx.json === 'function') {
+                    try {
+                        const body = await ctx.json();
+                        if (body?.error) detailedError = body.error;
+                    } catch { /* corpo não-JSON: fica a mensagem do SDK */ }
                 }
                 throw new Error(detailedError || "Erro ao conectar com serviço de envio de e-mails.");
             } else {
